@@ -18,6 +18,8 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-
+Route::get('/dashboard', function () {
+    return view('dashboard');
+});
 Route::get('/data', [DataController::class, 'index'])->name('data.index');
 Route::get('/data/download', [DataController::class, 'download'])->name('data.download');
