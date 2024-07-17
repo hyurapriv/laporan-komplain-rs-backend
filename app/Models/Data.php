@@ -26,4 +26,11 @@ class Data extends Model
     protected $casts = [
         'json' => 'array'
     ];
+
+    protected $dates = [
+        'created_at',
+        'datetime_masuk',
+        'datetime_pengerjaan',
+        'datetime_selesai',
+    ];
 }
