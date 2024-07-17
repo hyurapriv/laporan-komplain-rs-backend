@@ -3,57 +3,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Download Processed Data</title>
+    <title>Processed Data</title>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@10"></script>
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        h1 {
+            color: #333;
+        }
+        pre {
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            overflow-x: auto;
+        }
+        button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 15px 32px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+    </style>
 </head>
-<body class="bg-gray-100 p-8">
-    <div class="max-w-7xl mx-auto">
-        <h1 class="text-3xl font-bold mb-6">Processed Data</h1>
-        
-        <button onclick="downloadProcessedData()" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mb-6">
-            Download Processed Data
-        </button>
+<body>
+    <h1>Processed Data</h1>
+    
+    <button onclick="downloadProcessedData()">Download Processed Data</button>
 
-        <div class="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4 overflow-x-auto">
-            <table class="w-full">
-                <thead>
-                    <tr>
-                        <th class="px-4 py-2">ID</th>
-                        <th class="px-4 py-2">Nama Pelapor</th>
-                        <th class="px-4 py-2">Nama Petugas</th>
-                        <th class="px-4 py-2">Created At</th>
-                        <th class="px-4 py-2">Datetime Masuk</th>
-                        <th class="px-4 py-2">Datetime Pengerjaan</th>
-                        <th class="px-4 py-2">Datetime Selesai</th>
-                        <th class="px-4 py-2">Status</th>
-                        <th class="px-4 py-2">Is Pending</th>
-                        <th class="px-4 py-2">Nama Unit/Poli</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach($processedData as $data)
-                    <tr>
-                        <td class="border px-4 py-2">{{ $data['id'] }}</td>
-                        <td class="border px-4 py-2">{{ $data['Nama Pelapor'] }}</td>
-                        <td class="border px-4 py-2">{{ $data['Nama Petugas'] }}</td>
-                        <td class="border px-4 py-2">{{ $data['created_at'] }}</td>
-                        <td class="border px-4 py-2">{{ $data['datetime_masuk'] }}</td>
-                        <td class="border px-4 py-2">{{ $data['datetime_pengerjaan'] }}</td>
-                        <td class="border px-4 py-2">{{ $data['datetime_selesai'] }}</td>
-                        <td class="border px-4 py-2">{{ $data['status'] }}</td>
-                        <td class="border px-4 py-2">{{ $data['is_pending'] ? 'Yes' : 'No' }}</td>
-                        <td class="border px-4 py-2">{{ $data['Nama Unit/Poli'] }}</td>
-                    </tr>
-                    @endforeach
-                </tbody>
-            </table>
-        </div>
-    </div>
+    <pre><code>
+<?php print_r($processedData); ?>
+    </code></pre>
 
     <script>
     function downloadProcessedData() {
-        fetch('{{ route('processed-data.download') }}')
+        fetch('{{ route('data.download') }}')
             .then(response => response.blob())
             .then(blob => {
                 const url = window.URL.createObjectURL(blob);
