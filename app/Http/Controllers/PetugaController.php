@@ -6,5 +6,5 @@ use Illuminate\Http\Request;
 
 class PetugaController extends Controller
 {
-    //
+    public
 }
