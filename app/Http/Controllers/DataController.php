@@ -8,11 +8,14 @@ use Illuminate\Support\Facades\Storage;
 class DataController extends Controller
 {
     public function index()
-    {
-        $rawData = Data::where('form_id', 3)->limit(300)->get();
-        $processedData = $this->processData($rawData);
-        return view('index', compact('processedData'));
-    }
+{
+    $rawData = Data::where('form_id', 3)->limit(300)->get();
+    $processedData = $this->processData($rawData);
+    $statusCounts = $this->calculateStatusCounts($processedData);
+
+    return view('index', compact('processedData', 'statusCounts'));
+}
+
 
     public function download()
     {
@@ -77,4 +80,37 @@ class DataController extends Controller
         }
         return null;
     }
+
+    private function calculateStatusCounts($data)
+    {
+        $statusCounts = [
+            'terkirim' => 0,
+            'dalam_pengerjaan' => 0,
+            'selesai' => 0,
+            'pending' => 0,
+        ];
+    
+        foreach ($data as $item) {
+            if (isset($item['status'])) {
+                switch ($item['status']) {
+                    case 'terkirim':
+                        $statusCounts['terkirim']++;
+                        break;
+                    case 'dalam pengerjaan':
+                        $statusCounts['dalam_pengerjaan']++;
+                        break;
+                    case 'selesai':
+                        $statusCounts['selesai']++;
+                        break;
+                }
+            }
+    
+            if (isset($item['is_pending']) && $item['is_pending']) {
+                $statusCounts['pending']++;
+            }
+        }
+    
+        return $statusCounts;
+    }
+    
 }
