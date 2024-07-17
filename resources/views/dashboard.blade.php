@@ -60,36 +60,57 @@
                         </div>
                         <h3 class="text-gray-900 font-bold text-lg">Total</h3>
                     </div>
-                    <h3 class="text-gray-900 font-bold text-2xl mt-2">150</h3>
+                    <h3 class="text-gray-900 font-bold text-xl mt-2">150</h3>
                 </div>
                 <div class="flex flex-col items-center px-4 py-4 rounded-lg shadow-lg bg-white">
                     <div class="flex items-center space-x-2">
                         <div class="bg-green-sec rounded-full p-1.5 flex justify-center items-center">
-                            <img src="{{ asset('img/icon/terkirim.png') }}" width="20" height="20" alt="">
+                            <img src="{{ asset('img/icon/terkirim.png') }}" width="20" height="20"
+                                alt="">
                         </div>
                         <h3 class="text-gray-900 font-bold text-lg">Terkirim</h3>
                     </div>
-                    <h3 class="text-gray-900 font-bold text-2xl mt-2">150</h3>
+                    <h3 class="text-gray-900 font-bold text-xl mt-2">30</h3>
                 </div>
                 <div class="flex flex-col items-center px-4 py-4 rounded-lg shadow-lg bg-white">
                     <div class="flex items-center space-x-2">
                         <div class="bg-green-sec rounded-full p-1.5 flex justify-center items-center">
-                            <img src="{{ asset('img/icon/terkirim.png') }}" width="20" height="20" alt="">
+                            <img src="{{ asset('img/icon/proses.png') }}" width="20" height="20" alt="">
                         </div>
-                        <h3 class="text-gray-900 font-bold text-lg">Terkirim</h3>
+                        <h3 class="text-gray-900 font-bold text-lg">Diproses</h3>
                     </div>
-                    <h3 class="text-gray-900 font-bold text-2xl mt-2">150</h3>
+                    <h3 class="text-gray-900 font-bold text-xl mt-2">60</h3>
                 </div>
                 <div class="flex flex-col items-center px-4 py-4 rounded-lg shadow-lg bg-white">
                     <div class="flex items-center space-x-2">
                         <div class="bg-green-sec rounded-full p-1.5 flex justify-center items-center">
-                            <img src="{{ asset('img/icon/terkirim.png') }}" width="20" height="20" alt="">
+                            <img src="{{ asset('img/icon/selesai.png') }}" width="20" height="20" alt="">
                         </div>
-                        <h3 class="text-gray-900 font-bold text-lg">Terkirim</h3>
+                        <h3 class="text-gray-900 font-bold text-lg">Selesai</h3>
                     </div>
-                    <h3 class="text-gray-900 font-bold text-2xl mt-2">150</h3>
+                    <h3 class="text-gray-900 font-bold text-xl mt-2">50</h3>
                 </div>
-            </div> 
+                <div class="flex flex-col items-center px-4 py-4 rounded-lg shadow-lg bg-white">
+                    <div class="flex items-center space-x-2">
+                        <div class="bg-green-sec rounded-full p-1.5 flex justify-center items-center">
+                            <img src="{{ asset('img/icon/ditunda.png') }}" width="20" height="20"
+                                alt="">
+                        </div>
+                        <h3 class="text-gray-900 font-bold text-lg">Ditunda</h3>
+                    </div>
+                    <h3 class="text-gray-900 font-bold text-xl mt-2">10</h3>
+                </div>
+                <div class="flex flex-col items-center px-4 py-4 rounded-lg shadow-lg bg-white">
+                    <div class="flex items-center space-x-2">
+                        <div class="bg-green-sec rounded-full p-1.5 flex justify-center items-center">
+                            <img src="{{ asset('img/icon/respon-time.png') }}" width="20" height="20"
+                                alt="">
+                        </div>
+                        <h3 class="text-gray-900 font-bold text-md">Respon Time</h3>
+                    </div>
+                    <h3 class="text-gray-900 font-bold text-lg mt-2">144 Menit</h3>
+                </div>
+            </div>
         </div>
     </div>
 </body>
