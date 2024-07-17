@@ -15,4 +15,9 @@ class UnitController extends Controller
     {
         return view('unit.edit');
     }
+
+    public function info()
+    {
+        return view('unit.info');
+    }
 }
