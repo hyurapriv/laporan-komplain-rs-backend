@@ -59,40 +59,40 @@
     <button onclick="downloadProcessedData()">Download Processed Data</button>
 
     <pre><code>
-<?php print_r($processedData); ?>
+        <?php echo htmlspecialchars(json_encode($processedData, JSON_PRETTY_PRINT)); ?>
     </code></pre>
 
     <script>
-    function downloadProcessedData() {
-        fetch('{{ route('data.download') }}')
-            .then(response => response.blob())
-            .then(blob => {
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'processed_data.json';
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Data berhasil ditambahkan',
-                    text: 'File processed_data.json berhasil diunduh!',
-                    timer: 3000,
-                    timerProgressBar: true,
-                    showConfirmButton: false
+        function downloadProcessedData() {
+            fetch('{{ route('data.download') }}')
+                .then(response => response.blob())
+                .then(blob => {
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'processed_data.json';
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Data berhasil ditambahkan',
+                        text: 'File processed_data.json berhasil diunduh!',
+                        timer: 3000,
+                        timerProgressBar: true,
+                        showConfirmButton: false
+                    });
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Oops...',
+                        text: 'Terjadi kesalahan saat mengunduh data!',
+                    });
                 });
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Oops...',
-                    text: 'Terjadi kesalahan saat mengunduh data!',
-                });
-            });
-    }
+        }
     </script>
 </body>
 </html>

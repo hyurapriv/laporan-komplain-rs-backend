@@ -5,17 +5,17 @@ namespace App\Http\Controllers;
 use App\Models\Data;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
+
 class DataController extends Controller
 {
     public function index()
-{
-    $rawData = Data::where('form_id', 3)->limit(300)->get();
-    $processedData = $this->processData($rawData);
-    $statusCounts = Data::countStatusForForm3();
+    {
+        $rawData = Data::where('form_id', 3)->limit(300)->get();
+        $processedData = $this->processData($rawData);
+        $statusCounts = Data::countStatusForForm3();
 
-    return view('index', compact('processedData', 'statusCounts'));
-}
-
+        return view('index', compact('processedData', 'statusCounts'));
+    }
 
     public function download()
     {
@@ -35,10 +35,12 @@ class DataController extends Controller
 
         foreach ($rawDataArray as $data) {
             $parsedJson = $data->json;
+            $statusFromJson = $this->getValueFromJson($parsedJson, 'status');
+            $statusEnum = $statusFromJson ? Data::getStatusFromJson($data->id) : null;
 
             $namaPelapor = '';
             $namaUnit = '';
-            $status = $data->status ?? '';
+            $status = $data->status ?? $statusEnum;
 
             if (is_array($parsedJson) && !empty($parsedJson) && isset($parsedJson[0])) {
                 foreach ($parsedJson[0] as $item) {
@@ -71,6 +73,18 @@ class DataController extends Controller
         return $results;
     }
 
+    private function getValueFromJson($jsonData, $key)
+    {
+        // Memastikan nilai yang diberikan adalah string sebelum melakukan json_decode
+        if (is_string($jsonData)) {
+            $decodedJson = json_decode($jsonData, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                return $decodedJson[$key] ?? null;
+            }
+        }
+        return null;
+    }
+
     private function formatDateTime($dateTime)
     {
         if ($dateTime instanceof \Carbon\Carbon) {
@@ -80,28 +94,4 @@ class DataController extends Controller
         }
         return null;
     }
-
-    
-
-    public function countStatusForForm3()
-    {
-        $statusCounts = DB::table('form_values')
-            ->where('form_id', 3)
-            ->select(
-                DB::raw('SUM(CASE WHEN status = "terkirim" THEN 1 ELSE 0 END) as terkirim'),
-                DB::raw('SUM(CASE WHEN status = "Dalam Pengerjaan / Pengecekan Petugas" THEN 1 ELSE 0 END) as dalam_pengerjaan'),
-                DB::raw('SUM(CASE WHEN status = "selesai" THEN 1 ELSE 0 END) as selesai'),
-                DB::raw('SUM(CASE WHEN is_pending = 1 THEN 1 ELSE 0 END) as pending')
-            )
-            ->first();
-    
-        // Convert object to array and ensure all values are integers
-        $result = array_map('intval', (array)$statusCounts);
-    
-        // Calculate total
-        $result['total'] = array_sum($result);
-    
-        return $result;
-    }
-    
 }

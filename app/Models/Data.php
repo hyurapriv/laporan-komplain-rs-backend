@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+
 class Data extends Model
 {
     use HasFactory;
@@ -49,5 +50,47 @@ class Data extends Model
         $result['total'] = array_sum($result);
 
         return $result;
+    }
+
+    public static function getStatusFromJson($formId)
+    {
+        // Mendapatkan nilai JSON dari kolom 'json' dalam tabel 'form_values'
+        $jsonValue = self::where('id', $formId)->value('json');
+
+        // Dekode JSON menjadi array asosiatif
+        $decodedJson = json_decode($jsonValue, true);
+
+        // Jika tidak ada status dalam JSON, kembalikan null
+        if (!isset($decodedJson['status'])) {
+            return null;
+        }
+
+        // Mendapatkan enum berdasarkan nilai status dari JSON
+        $statusKey = Status::fromValue($decodedJson['status']);
+
+        return $statusKey;
+    }
+}
+
+// Enum Status yang sudah didefinisikan sebelumnya
+enum Status: string
+{
+    const VALUES = [
+        'DRAFT' => 'Draft',
+        'IN_PROGRESS' => 'Dalam Pengerjaan',
+        'CHECKING' => 'Pengecekan Petugas',
+        'COMPLETED' => 'Selesai',
+        'TERKIRIM' => 'Terkirim'
+    ];
+
+    public static function fromValue(string $value): ?string
+    {
+        $key = array_search($value, self::VALUES);
+        return $key !== false ? $key : null;
+    }
+
+    public static function label(string $key): ?string
+    {
+        return self::VALUES[$key] ?? null;
     }
 }
