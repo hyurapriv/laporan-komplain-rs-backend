@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers;
 
 use App\Models\Data;
@@ -73,8 +74,21 @@ class DataController extends Controller
 
     private function normalizePetugasNames($petugas)
     {
-        $petugas = str_replace(['Adi', 'Adikaka Wicaksana', 'Adikaka', 'adikaka', 'dika', 'dikq','AAdika'], 'Adika', $petugas);
-        $petugas = str_replace(['virgie'], 'Virgie', $petugas);
+        $replacements = [
+            'Adi' => 'Adika',
+            'Adika Wicaksana' => 'Adika',
+            'Adikaka' => 'Adika',
+            'adikaka' => 'Adika',
+            'dika' => 'Adika',
+            'dikq' => 'Adika',
+            'AAdika' => 'Adika',
+            'virgie' => 'Virgie',
+        ];
+
+        foreach ($replacements as $oldName => $newName) {
+            $petugas = str_replace($oldName, $newName, $petugas);
+        }
+
         return $petugas;
     }
 
@@ -90,8 +104,9 @@ class DataController extends Controller
         ];
 
         foreach ($processedData as $data) {
-            $petugasList = explode(',', $data['Nama Petugas']);
-            $uniquePetugas = array_map('trim', array_unique($petugasList));
+            // Mengambil nama petugas dan menghilangkan spasi berlebih
+            $petugasList = array_map('trim', explode(',', $data['Nama Petugas']));
+            $uniquePetugas = array_unique($petugasList);
 
             foreach ($uniquePetugas as $petugas) {
                 if (isset($petugasCounts[$petugas])) {
