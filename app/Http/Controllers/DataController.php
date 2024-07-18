@@ -10,7 +10,7 @@ class DataController extends Controller
 {
     public function index()
     {
-        $rawData = Data::where('form_id', 3)->limit(300)->get();
+        $rawData = Data::where('form_id', 3)->get();
         $processedData = $this->processData($rawData);
         $statusCounts = Data::countStatusForForm3();
 
@@ -22,7 +22,7 @@ class DataController extends Controller
 
     public function download()
     {
-        $rawData = Data::where('form_id', 3)->limit(200)->get();
+        $rawData = Data::where('form_id', 3)->get();
         $processedData = $this->processData($rawData);
         $jsonData = json_encode($processedData, JSON_PRETTY_PRINT);
         
