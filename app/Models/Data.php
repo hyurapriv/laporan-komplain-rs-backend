@@ -45,7 +45,7 @@ class Data extends Model
                 DB::raw('SUM(CASE WHEN is_pending = 1 THEN 1 ELSE 0 END) as pending')
             )
             ->first()
-            ->toArray();
+            ->toArray(); 
 
         // Menambahkan log untuk status counts
         Log::info('Status Counts:', $statusCounts);

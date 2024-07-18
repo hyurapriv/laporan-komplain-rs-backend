@@ -59,15 +59,15 @@ class DataController extends Controller
 
             $results[] = [
                 'id' => $data->id,
-                'Nama Pelapor' => $namaPelapor,
-                'Nama Petugas' => $data->petugas,
-                'created_at' => $this->formatDateTime($data->created_at),
-                'datetime_masuk' => $this->formatDateTime($data->datetime_masuk),
-                'datetime_pengerjaan' => $this->formatDateTime($data->datetime_pengerjaan),
-                'datetime_selesai' => $this->formatDateTime($data->datetime_selesai),
+                 'Nama Pelapor' => $namaPelapor,
+                 'Nama Petugas' => $data->petugas,
+                 'created_at' => $this->formatDateTime($data->created_at),
+                 'datetime_masuk' => $this->formatDateTime($data->datetime_masuk),
+                 'datetime_pengerjaan' => $this->formatDateTime($data->datetime_pengerjaan),
+                 'datetime_selesai' => $this->formatDateTime($data->datetime_selesai),
                 'status' => $status,
-                'is_pending' => $data->is_pending,
-                'Nama Unit/Poli' => $namaUnit
+                 'is_pending' => $data->is_pending,
+                 'Nama Unit/Poli' => $namaUnit
             ];
         }
 
