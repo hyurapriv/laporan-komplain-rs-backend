@@ -39,7 +39,16 @@
                     <h3 class="text-xs sm:text-sm lg:text-lg font-bold text-gray-900">Selasa, 9 Juli 2024 12:30:47</h3>
                 </div>
             </div>
-            <div class="card grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mt-8 sm:mt-14 px-4 sm:px-14">
+            <div class="card grid grid-cols-2 lg:grid-cols-6 gap-4 mt-8 sm:mt-14 px-4 sm:px-14">
+                <div class="flex flex-col items-center px-2 sm:px-4 py-3 sm:py-4 rounded-lg shadow-lg bg-white">
+                    <div class="flex items-center space-x-2">
+                        <div class="bg-green-sec rounded-full p-1 sm:p-1.5 flex justify-center items-center">
+                            <img src="{{ asset('img/icon/total.png') }}" class="w-4 h-4 sm:w-5 sm:h-5" alt="">
+                        </div>
+                        <h3 class="text-gray-900 font-bold text-sm sm:text-lg">Total</h3>
+                    </div>
+                    <h3 class="text-gray-900 font-bold text-lg sm:text-xl mt-2">30</h3>
+                </div>
                 <div class="flex flex-col items-center px-2 sm:px-4 py-3 sm:py-4 rounded-lg shadow-lg bg-white">
                     <div class="flex items-center space-x-2">
                         <div class="bg-green-sec rounded-full p-1 sm:p-1.5 flex justify-center items-center">
