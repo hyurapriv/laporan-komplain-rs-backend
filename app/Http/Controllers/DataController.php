@@ -12,10 +12,7 @@ class DataController extends Controller
     {
         $rawData = Data::where('form_id', 3)->get();
         $processedData = $this->processData($rawData);
-        $statusCounts = Data::countStatusForForm3();
-
-        Log::info('Processed Data:', $processedData);
-        Log::info('Status Counts:', $statusCounts);
+        $statusCounts = $this->getStatusCounts($processedData);
 
         return view('index', compact('processedData', 'statusCounts'));
     }
@@ -42,7 +39,6 @@ class DataController extends Controller
             $namaPelapor = '';
             $namaUnit = '';
             $status = $data->status ?? '';
-
             if (is_array($parsedJson) && !empty($parsedJson) && isset($parsedJson[0])) {
                 foreach ($parsedJson[0] as $item) {
                     if (isset($item['name']) && isset($item['value'])) {
@@ -59,22 +55,49 @@ class DataController extends Controller
 
             $results[] = [
                 'id' => $data->id,
-                 'Nama Pelapor' => $namaPelapor,
-                 'Nama Petugas' => $data->petugas,
-                 'created_at' => $this->formatDateTime($data->created_at),
-                 'datetime_masuk' => $this->formatDateTime($data->datetime_masuk),
-                 'datetime_pengerjaan' => $this->formatDateTime($data->datetime_pengerjaan),
-                 'datetime_selesai' => $this->formatDateTime($data->datetime_selesai),
+                'Nama Pelapor' => $namaPelapor,
+                'Nama Petugas' => $data->petugas,
+                'created_at' => $this->formatDateTime($data->created_at),
+                'datetime_masuk' => $this->formatDateTime($data->datetime_masuk),
+                'datetime_pengerjaan' => $this->formatDateTime($data->datetime_pengerjaan),
+                'datetime_selesai' => $this->formatDateTime($data->datetime_selesai),
                 'status' => $status,
-                 'is_pending' => $data->is_pending,
-                 'Nama Unit/Poli' => $namaUnit
+                'is_pending' => $data->is_pending,
+                'Nama Unit/Poli' => $namaUnit
             ];
         }
 
-        Log::info('Results:', $results);
-
         return $results;
     }
+
+    private function getStatusCounts($processedData)
+{
+    $statusCounts = [
+        'pending' => 0,
+        'Selesai' => 0, // inisialisasi jumlah status 'Selesai'
+        // tambahkan status lainnya jika ada
+    ];
+
+    foreach ($processedData as $data) {
+        if ($data['is_pending']) {
+            $statusCounts['pending']++;
+        } elseif ($data['status'] === 'Selesai') {
+            $statusCounts['Selesai']++;
+        } elseif (!empty($data['status'])) {
+            $status = $data['status'];
+
+            if (isset($statusCounts[$status])) {
+                $statusCounts[$status]++;
+            } else {
+                $statusCounts[$status] = 1;
+            }
+        }
+    }
+
+    return $statusCounts;
+}
+
+    
 
     private function formatDateTime($dateTime)
     {

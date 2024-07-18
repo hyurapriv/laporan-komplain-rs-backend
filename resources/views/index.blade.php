@@ -49,11 +49,10 @@
     <h1>Processed Data</h1>
     
     <h2>Status Counts</h2>
+    @foreach ($statusCounts as $status => $count)
     <ul>
-        <li>Terkirim: {{ $statusCounts['terkirim'] ?? 0 }}</li>
-        <li>Dalam Pengerjaan: {{ $statusCounts['dalam_pengerjaan'] ?? 0 }}</li>
-        <li>Selesai: {{ $statusCounts['selesai'] ?? 0 }}</li>
-        <li>Pending: {{ $statusCounts['pending'] ?? 0 }}</li>
+        <li>{{ $status }}: {{ $count }}</li>
+        @endforeach
     </ul>
 
     @if (!empty($processedData))
