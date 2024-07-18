@@ -4,14 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\Data;
 use Illuminate\Support\Facades\Storage;
-
+use Illuminate\Support\Facades\DB;
 class DataController extends Controller
 {
     public function index()
 {
     $rawData = Data::where('form_id', 3)->limit(300)->get();
     $processedData = $this->processData($rawData);
-    $statusCounts = $this->calculateStatusCounts($processedData);
+    $statusCounts = Data::countStatusForForm3();
 
     return view('index', compact('processedData', 'statusCounts'));
 }
@@ -81,36 +81,27 @@ class DataController extends Controller
         return null;
     }
 
-    private function calculateStatusCounts($data)
+    
+
+    public function countStatusForForm3()
     {
-        $statusCounts = [
-            'terkirim' => 0,
-            'dalam_pengerjaan' => 0,
-            'selesai' => 0,
-            'pending' => 0,
-        ];
+        $statusCounts = DB::table('form_values')
+            ->where('form_id', 3)
+            ->select(
+                DB::raw('SUM(CASE WHEN status = "terkirim" THEN 1 ELSE 0 END) as terkirim'),
+                DB::raw('SUM(CASE WHEN status = "Dalam Pengerjaan / Pengecekan Petugas" THEN 1 ELSE 0 END) as dalam_pengerjaan'),
+                DB::raw('SUM(CASE WHEN status = "selesai" THEN 1 ELSE 0 END) as selesai'),
+                DB::raw('SUM(CASE WHEN is_pending = 1 THEN 1 ELSE 0 END) as pending')
+            )
+            ->first();
     
-        foreach ($data as $item) {
-            if (isset($item['status'])) {
-                switch ($item['status']) {
-                    case 'terkirim':
-                        $statusCounts['terkirim']++;
-                        break;
-                    case 'dalam pengerjaan':
-                        $statusCounts['dalam_pengerjaan']++;
-                        break;
-                    case 'selesai':
-                        $statusCounts['selesai']++;
-                        break;
-                }
-            }
+        // Convert object to array and ensure all values are integers
+        $result = array_map('intval', (array)$statusCounts);
     
-            if (isset($item['is_pending']) && $item['is_pending']) {
-                $statusCounts['pending']++;
-            }
-        }
+        // Calculate total
+        $result['total'] = array_sum($result);
     
-        return $statusCounts;
+        return $result;
     }
     
 }
