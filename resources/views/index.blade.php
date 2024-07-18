@@ -50,49 +50,49 @@
     
     <h2>Status Counts</h2>
     <ul>
-        <li>Terkirim: {{ $statusCounts['terkirim'] }}</li>
-        <li>Dalam Pengerjaan: {{ $statusCounts['dalam_pengerjaan'] }}</li>
-        <li>Selesai: {{ $statusCounts['selesai'] }}</li>
-        <li>Pending: {{ $statusCounts['pending'] }}</li>
+        <li>Terkirim: {{ $statusCounts['terkirim'] ?? 0 }}</li>
+        <li>Dalam Pengerjaan: {{ $statusCounts['dalam_pengerjaan'] ?? 0 }}</li>
+        <li>Selesai: {{ $statusCounts['selesai'] ?? 0 }}</li>
+        <li>Pending: {{ $statusCounts['pending'] ?? 0 }}</li>
     </ul>
 
     <button onclick="downloadProcessedData()">Download Processed Data</button>
 
     <pre><code>
-        <?php echo htmlspecialchars(json_encode($processedData, JSON_PRETTY_PRINT)); ?>
+<?php print_r($processedData); ?>
     </code></pre>
 
     <script>
-        function downloadProcessedData() {
-            fetch('{{ route('data.download') }}')
-                .then(response => response.blob())
-                .then(blob => {
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = 'processed_data.json';
-                    document.body.appendChild(a);
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                    
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Data berhasil ditambahkan',
-                        text: 'File processed_data.json berhasil diunduh!',
-                        timer: 3000,
-                        timerProgressBar: true,
-                        showConfirmButton: false
-                    });
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Oops...',
-                        text: 'Terjadi kesalahan saat mengunduh data!',
-                    });
+    function downloadProcessedData() {
+        fetch('{{ route('data.download') }}')
+            .then(response => response.blob())
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'processed_data.json';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Data berhasil ditambahkan',
+                    text: 'File processed_data.json berhasil diunduh!',
+                    timer: 3000,
+                    timerProgressBar: true,
+                    showConfirmButton: false
                 });
-        }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Oops...',
+                    text: 'Terjadi kesalahan saat mengunduh data!',
+                });
+            });
+    }
     </script>
 </body>
 </html>

@@ -1,10 +1,10 @@
 <?php
-
 namespace App\Http\Controllers;
 
 use App\Models\Data;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class DataController extends Controller
 {
@@ -13,6 +13,9 @@ class DataController extends Controller
         $rawData = Data::where('form_id', 3)->limit(300)->get();
         $processedData = $this->processData($rawData);
         $statusCounts = Data::countStatusForForm3();
+
+        Log::info('Processed Data:', $processedData);
+        Log::info('Status Counts:', $statusCounts);
 
         return view('index', compact('processedData', 'statusCounts'));
     }
@@ -35,12 +38,10 @@ class DataController extends Controller
 
         foreach ($rawDataArray as $data) {
             $parsedJson = $data->json;
-            $statusFromJson = $this->getValueFromJson($parsedJson, 'status');
-            $statusEnum = $statusFromJson ? Data::getStatusFromJson($data->id) : null;
 
             $namaPelapor = '';
             $namaUnit = '';
-            $status = $data->status ?? $statusEnum;
+            $status = $data->status ?? '';
 
             if (is_array($parsedJson) && !empty($parsedJson) && isset($parsedJson[0])) {
                 foreach ($parsedJson[0] as $item) {
@@ -70,19 +71,9 @@ class DataController extends Controller
             ];
         }
 
-        return $results;
-    }
+        Log::info('Results:', $results);
 
-    private function getValueFromJson($jsonData, $key)
-    {
-        // Memastikan nilai yang diberikan adalah string sebelum melakukan json_decode
-        if (is_string($jsonData)) {
-            $decodedJson = json_decode($jsonData, true);
-            if (json_last_error() === JSON_ERROR_NONE) {
-                return $decodedJson[$key] ?? null;
-            }
-        }
-        return null;
+        return $results;
     }
 
     private function formatDateTime($dateTime)

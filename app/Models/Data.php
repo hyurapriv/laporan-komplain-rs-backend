@@ -1,10 +1,10 @@
 <?php
-
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class Data extends Model
 {
@@ -39,58 +39,27 @@ class Data extends Model
     {
         $statusCounts = self::where('form_id', 3)
             ->select(
-                DB::raw('SUM(CASE WHEN status = "terkirim" THEN 1 ELSE 0 END) as terkirim'),
+                DB::raw('SUM(CASE WHEN status = "Terkirim" THEN 1 ELSE 0 END) as terkirim'),
                 DB::raw('SUM(CASE WHEN status = "Dalam Pengerjaan / Pengecekan Petugas" THEN 1 ELSE 0 END) as dalam_pengerjaan'),
-                DB::raw('SUM(CASE WHEN status = "selesai" THEN 1 ELSE 0 END) as selesai'),
+                DB::raw('SUM(CASE WHEN status = "Selesai" THEN 1 ELSE 0 END) as selesai'),
                 DB::raw('SUM(CASE WHEN is_pending = 1 THEN 1 ELSE 0 END) as pending')
             )
-            ->first();
+            ->first()
+            ->toArray();
 
-        $result = array_map('intval', $statusCounts->toArray());
-        $result['total'] = array_sum($result);
+        // Menambahkan log untuk status counts
+        Log::info('Status Counts:', $statusCounts);
 
-        return $result;
-    }
+        // Pastikan semua kunci yang diharapkan ada dalam array
+        $statusCounts = array_merge([
+            'terkirim' => 0,
+            'dalam_pengerjaan' => 0,
+            'selesai' => 0,
+            'pending' => 0,
+        ], $statusCounts);
 
-    public static function getStatusFromJson($formId)
-    {
-        // Mendapatkan nilai JSON dari kolom 'json' dalam tabel 'form_values'
-        $jsonValue = self::where('id', $formId)->value('json');
+        Log::info('Merged Status Counts:', $statusCounts);
 
-        // Dekode JSON menjadi array asosiatif
-        $decodedJson = json_decode($jsonValue, true);
-
-        // Jika tidak ada status dalam JSON, kembalikan null
-        if (!isset($decodedJson['status'])) {
-            return null;
-        }
-
-        // Mendapatkan enum berdasarkan nilai status dari JSON
-        $statusKey = Status::fromValue($decodedJson['status']);
-
-        return $statusKey;
-    }
-}
-
-// Enum Status yang sudah didefinisikan sebelumnya
-enum Status: string
-{
-    const VALUES = [
-        'DRAFT' => 'Draft',
-        'IN_PROGRESS' => 'Dalam Pengerjaan',
-        'CHECKING' => 'Pengecekan Petugas',
-        'COMPLETED' => 'Selesai',
-        'TERKIRIM' => 'Terkirim'
-    ];
-
-    public static function fromValue(string $value): ?string
-    {
-        $key = array_search($value, self::VALUES);
-        return $key !== false ? $key : null;
-    }
-
-    public static function label(string $key): ?string
-    {
-        return self::VALUES[$key] ?? null;
+        return $statusCounts;
     }
 }
