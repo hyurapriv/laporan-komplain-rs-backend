@@ -56,11 +56,15 @@
         <li>Pending: {{ $statusCounts['pending'] ?? 0 }}</li>
     </ul>
 
-    <button onclick="downloadProcessedData()">Download Processed Data</button>
+    @if (!empty($processedData))
+        <button onclick="downloadProcessedData()">Download Processed Data</button>
 
-    <pre><code>
-<?php print_r($processedData); ?>
-    </code></pre>
+        <pre><code>
+        <?php print_r($processedData); ?>
+        </code></pre>
+    @else
+        <p>Data tidak tersedia atau terjadi kesalahan dalam pemrosesan.</p>
+    @endif
 
     <script>
     function downloadProcessedData() {
