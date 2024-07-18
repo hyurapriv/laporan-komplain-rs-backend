@@ -49,17 +49,24 @@
     <h1>Processed Data</h1>
     
     <h2>Status Counts</h2>
-    @foreach ($statusCounts as $status => $count)
     <ul>
+    @foreach ($statusCounts as $status => $count)
         <li>{{ $status }}: {{ $count }}</li>
-        @endforeach
+    @endforeach
+    </ul>
+
+    <h2>Petugas Counts</h2>
+    <ul>
+    @foreach ($petugasCounts as $petugas => $count)
+        <li>{{ $petugas }}: {{ $count }}</li>
+    @endforeach
     </ul>
 
     @if (!empty($processedData))
         <button onclick="downloadProcessedData()">Download Processed Data</button>
 
         <pre><code>
-        <?php print_r($processedData); ?>
+        {{ print_r($processedData) }}
         </code></pre>
     @else
         <p>Data tidak tersedia atau terjadi kesalahan dalam pemrosesan.</p>
@@ -80,7 +87,7 @@
                 
                 Swal.fire({
                     icon: 'success',
-                    title: 'Data berhasil ditambahkan',
+                    title: 'Data berhasil diunduh',
                     text: 'File processed_data.json berhasil diunduh!',
                     timer: 3000,
                     timerProgressBar: true,

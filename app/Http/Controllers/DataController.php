@@ -13,8 +13,9 @@ class DataController extends Controller
         $rawData = Data::where('form_id', 3)->get();
         $processedData = $this->processData($rawData);
         $statusCounts = $this->getStatusCounts($processedData);
+        $petugasCounts = $this->getPetugasCounts($processedData);
 
-        return view('index', compact('processedData', 'statusCounts'));
+        return view('index', compact('processedData', 'statusCounts', 'petugasCounts'));
     }
 
     public function download()
@@ -22,10 +23,10 @@ class DataController extends Controller
         $rawData = Data::where('form_id', 3)->get();
         $processedData = $this->processData($rawData);
         $jsonData = json_encode($processedData, JSON_PRETTY_PRINT);
-        
+
         $fileName = 'processed_data.json';
         Storage::put('public/' . $fileName, $jsonData);
-        
+
         return response()->download(storage_path('app/public/' . $fileName))->deleteFileAfterSend(true);
     }
 
@@ -56,7 +57,7 @@ class DataController extends Controller
             $results[] = [
                 'id' => $data->id,
                 'Nama Pelapor' => $namaPelapor,
-                'Nama Petugas' => $data->petugas,
+                'Nama Petugas' => $this->normalizePetugasNames($data->petugas),
                 'created_at' => $this->formatDateTime($data->created_at),
                 'datetime_masuk' => $this->formatDateTime($data->datetime_masuk),
                 'datetime_pengerjaan' => $this->formatDateTime($data->datetime_pengerjaan),
@@ -70,11 +71,43 @@ class DataController extends Controller
         return $results;
     }
 
+    private function normalizePetugasNames($petugas)
+    {
+        $petugas = str_replace(['Adi', 'Adikaka Wicaksana', 'Adikaka', 'adikaka', 'dika', 'dikq','AAdika'], 'Adika', $petugas);
+        $petugas = str_replace(['virgie'], 'Virgie', $petugas);
+        return $petugas;
+    }
+
+    private function getPetugasCounts($processedData)
+    {
+        $petugasCounts = [
+            'Ganang' => 0,
+            'Agus' => 0,
+            'Ali Muhson' => 0,
+            'Virgie' => 0,
+            'Bayu' => 0,
+            'Adika' => 0,
+        ];
+
+        foreach ($processedData as $data) {
+            $petugasList = explode(',', $data['Nama Petugas']);
+            $uniquePetugas = array_map('trim', array_unique($petugasList));
+
+            foreach ($uniquePetugas as $petugas) {
+                if (isset($petugasCounts[$petugas])) {
+                    $petugasCounts[$petugas]++;
+                }
+            }
+        }
+
+        return $petugasCounts;
+    }
+
     private function getStatusCounts($processedData)
     {
         $statusCounts = [
             'pending' => 0,
-            'Selesai' => 0, // inisialisasi jumlah status 'Selesai'
+            'Selesai' => 0,
             // tambahkan status lainnya jika ada
         ];
 
