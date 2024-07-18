@@ -71,33 +71,33 @@ class DataController extends Controller
     }
 
     private function getStatusCounts($processedData)
-{
-    $statusCounts = [
-        'pending' => 0,
-        'Selesai' => 0, // inisialisasi jumlah status 'Selesai'
-        // tambahkan status lainnya jika ada
-    ];
+    {
+        $statusCounts = [
+            'pending' => 0,
+            'Selesai' => 0, // inisialisasi jumlah status 'Selesai'
+            // tambahkan status lainnya jika ada
+        ];
 
-    foreach ($processedData as $data) {
-        if ($data['is_pending']) {
-            $statusCounts['pending']++;
-        } elseif ($data['status'] === 'Selesai') {
-            $statusCounts['Selesai']++;
-        } elseif (!empty($data['status'])) {
-            $status = $data['status'];
-
-            if (isset($statusCounts[$status])) {
-                $statusCounts[$status]++;
+        foreach ($processedData as $data) {
+            if ($data['is_pending']) {
+                if ($data['status'] === 'Selesai') {
+                    $statusCounts['Selesai']++;
+                } elseif ($data['status'] === 'Dalam Pengerjaan' || $data['status'] === 'Pengecekan Petugas') {
+                    $statusCounts['pending']++;
+                } else {
+                    $statusCounts['pending']++;
+                }
             } else {
-                $statusCounts[$status] = 1;
+                if (isset($statusCounts[$data['status']])) {
+                    $statusCounts[$data['status']]++;
+                } else {
+                    $statusCounts[$data['status']] = 1;
+                }
             }
         }
+
+        return $statusCounts;
     }
-
-    return $statusCounts;
-}
-
-    
 
     private function formatDateTime($dateTime)
     {
