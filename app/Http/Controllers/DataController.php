@@ -15,8 +15,9 @@ class DataController extends Controller
         $processedData = $this->processData($rawData);
         $statusCounts = $this->getStatusCounts($processedData);
         $petugasCounts = $this->getPetugasCounts($processedData);
+        $unitCounts = $this->getUnitCounts($processedData);
 
-        return view('index', compact('processedData', 'statusCounts', 'petugasCounts'));
+        return view('index', compact('processedData', 'statusCounts', 'petugasCounts','unitCounts'));
     }
 
     public function download()
@@ -145,6 +146,30 @@ class DataController extends Controller
         }
 
         return $statusCounts;
+    }
+
+    private function getunitCounts($processedData)
+    {
+        $unitCounts = [
+            'Farmasi' => 0,
+            'LABORATORIUM & PELAYANAN DARAH' => 0,
+            'IBS' => 0,
+        ];
+
+        foreach ($processedData as $data) {
+            if (isset($data['Nama Unit/Poli'])) {
+                $unit = $data['Nama Unit/Poli'];
+                if (!empty($unit)) {
+                    if (isset($unitCounts[$unit])) {
+                        $unitCounts[$unit]++;
+                    } else {
+                        $unitCounts[$unit] = 1;
+                    }
+                }
+            }
+        }
+
+        return $unitCounts;
     }
 
     private function formatDateTime($dateTime)
