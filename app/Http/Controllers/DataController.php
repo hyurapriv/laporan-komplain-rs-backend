@@ -4,200 +4,138 @@ namespace App\Http\Controllers;
 
 use App\Models\Data;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 class DataController extends Controller
 {
     public function index()
     {
-        $rawData = Data::where('form_id', 3)->get();
-        $processedData = $this->processData($rawData);
+        $processedData = $this->getProcessedData();
         $statusCounts = $this->getStatusCounts($processedData);
         $petugasCounts = $this->getPetugasCounts($processedData);
-        $unitCounts = $this->getUnitCounts($processedData);
+        $unitCounts = $this->getCountsByKey($processedData, 'Nama Unit/Poli');
 
         return view('index', compact('processedData', 'statusCounts', 'petugasCounts', 'unitCounts'));
     }
 
     public function download()
     {
-        $rawData = Data::where('form_id', 3)->get();
-        $processedData = $this->processData($rawData);
-        $jsonData = json_encode($processedData, JSON_PRETTY_PRINT);
-
+        $processedData = $this->getProcessedData();
         $fileName = 'processed_data.json';
-        Storage::put('public/' . $fileName, $jsonData);
+        Storage::put('public/' . $fileName, json_encode($processedData, JSON_PRETTY_PRINT));
 
         return response()->download(storage_path('app/public/' . $fileName))->deleteFileAfterSend(true);
     }
 
-    private function processData($rawDataArray)
+    private function getProcessedData()
     {
-        $results = [];
+        return Data::where('form_id', 3)->get()->map(function ($data) {
+            $parsedJson = $data->json[0] ?? [];
+            $extractedData = $this->extractDataFromJson($parsedJson);
 
-        foreach ($rawDataArray as $data) {
-            $parsedJson = $data->json;
-
-            $namaPelapor = '';
-            $namaUnit = '';
-            $status = $data->status ?? '';
-            if (is_array($parsedJson) && !empty($parsedJson) && isset($parsedJson[0])) {
-                foreach ($parsedJson[0] as $item) {
-                    if (isset($item['name']) && isset($item['value'])) {
-                        if ($item['name'] === 'text-1709615631557-0') {
-                            $namaPelapor = $item['value'];
-                        } elseif ($item['name'] === 'text-1709615712000-0') {
-                            $namaUnit = $item['value'];
-                        } elseif ($item['name'] === 'Status') {
-                            $status = $item['value'];
-                        }
-                    }
-                }
-            }
-
-            $results[] = [
+            return [
                 'id' => $data->id,
-                'Nama Pelapor' => $namaPelapor,
+                'Nama Pelapor' => $extractedData['namaPelapor'],
                 'Nama Petugas' => $this->normalizePetugasNames($data->petugas),
                 'created_at' => $this->formatDateTime($data->created_at),
                 'datetime_masuk' => $this->formatDateTime($data->datetime_masuk),
                 'datetime_pengerjaan' => $this->formatDateTime($data->datetime_pengerjaan),
                 'datetime_selesai' => $this->formatDateTime($data->datetime_selesai),
-                'status' => $status,
+                'status' => $extractedData['status'] ?? $data->status ?? '',
                 'is_pending' => $data->is_pending,
-                'Nama Unit/Poli' => $namaUnit
+                'Nama Unit/Poli' => $extractedData['namaUnit']
             ];
-        }
+        })->toArray();
+    }
 
-        return $results;
+    private function extractDataFromJson($parsedJson)
+    {
+        $data = ['namaPelapor' => '', 'namaUnit' => '', 'status' => ''];
+        foreach ($parsedJson as $item) {
+            if (isset($item['name'], $item['value'])) {
+                switch ($item['name']) {
+                    case 'text-1709615631557-0':
+                        $data['namaPelapor'] = $item['value'];
+                        break;
+                    case 'text-1709615712000-0':
+                        $data['namaUnit'] = $item['value'];
+                        break;
+                    case 'Status':
+                        $data['status'] = $item['value'];
+                        break;
+                }
+            }
+        }
+        return $data;
     }
 
     private function normalizePetugasNames($petugas)
-{
-    $replacements = [
-        'Adi' => 'Adika',
-        'Adika Wicaksana' => 'Adika',
-        'Adikaka' => 'Adika',
-        'adikaka' => 'Adika',
-        'dika' => 'Adika',
-        'Dika' => 'Adika',
-        'dikq' => 'Adika',
-        'Dikq' => 'Adika',
-        'AAdika' => 'Adika',
-        'virgie' => 'Virgie',
-        'Vi' => 'Virgie',
-        'vi' => 'Virgie',
-        'Virgie Dika' => 'Virgie, Adika',
-        'Virgie dikq' => 'Virgie, Adika',
-        // Tambahkan lebih banyak jika diperlukan
-    ];
+    {
+        $replacements = [
+            'Adi' => 'Adika', 'Adika Wicaksana' => 'Adika', 'Adikaka' => 'Adika',
+            'adikaka' => 'Adika', 'dika' => 'Adika', 'Dika' => 'Adika',
+            'dikq' => 'Adika', 'Dikq' => 'Adika', 'AAdika' => 'Adika',
+            'virgie' => 'Virgie', 'Vi' => 'Virgie', 'vi' => 'Virgie',
+            'Virgie Dika' => 'Virgie, Adika', 'Virgie dikq' => 'Virgie, Adika',
+        ];
 
-    $petugasList = preg_split('/\s*[,&]\s*|\s+dan\s+/i', $petugas);
-    $normalizedList = [];
+        $petugasList = preg_split('/\s*[,&]\s*|\s+dan\s+/i', $petugas);
+        $normalizedList = array_map(function($name) use ($replacements) {
+            return $replacements[trim($name)] ?? trim($name);
+        }, $petugasList);
 
-    foreach ($petugasList as $name) {
-        $trimmedName = trim($name);
-        if (array_key_exists($trimmedName, $replacements)) {
-            $normalizedNames = explode(', ', $replacements[$trimmedName]);
-            $normalizedList = array_merge($normalizedList, $normalizedNames);
-        } else {
-            $normalizedList[] = $trimmedName;
-        }
+        return implode(', ', array_unique($normalizedList));
     }
 
-    return implode(', ', array_unique($normalizedList));
-}
+    private function getPetugasCounts($processedData)
+    {
+        $petugasCounts = array_fill_keys(['Ganang', 'Agus', 'Ali Muhson', 'Virgie', 'Bayu', 'Adika'], 0);
 
-private function getPetugasCounts($processedData)
-{
-    $petugasCounts = [
-        'Ganang' => 0,
-        'Agus' => 0,
-        'Ali Muhson' => 0,
-        'Virgie' => 0,
-        'Bayu' => 0,
-        'Adika' => 0,
-    ];
-
-    foreach ($processedData as $data) {
-        $petugasList = explode(', ', $data['Nama Petugas']);
-        $uniquePetugas = array_unique($petugasList);
-
-        foreach ($uniquePetugas as $petugas) {
-            $normalizedPetugas = trim($petugas);
-            if (isset($petugasCounts[$normalizedPetugas])) {
-                $petugasCounts[$normalizedPetugas]++;
+        foreach ($processedData as $data) {
+            $petugasList = array_unique(explode(', ', $data['Nama Petugas']));
+            foreach ($petugasList as $petugas) {
+                if (isset($petugasCounts[$petugas])) {
+                    $petugasCounts[$petugas]++;
+                }
             }
         }
+
+        return array_filter($petugasCounts);
     }
-
-    // Menghapus entri dengan nilai 0
-    $petugasCounts = array_filter($petugasCounts);
-
-    return $petugasCounts;
-}
 
     private function getStatusCounts($processedData)
     {
-        $statusCounts = [
-            'pending' => 0,
-            'Selesai' => 0,
-            // tambahkan status lainnya jika ada
-        ];
+        $statusCounts = ['pending' => 0, 'Selesai' => 0];
 
         foreach ($processedData as $data) {
             if ($data['is_pending']) {
                 if ($data['status'] === 'Selesai') {
                     $statusCounts['Selesai']++;
-                } elseif ($data['status'] === 'Dalam Pengerjaan' || $data['status'] === 'Pengecekan Petugas') {
-                    $statusCounts['pending']++;
                 } else {
                     $statusCounts['pending']++;
                 }
             } else {
-                if (isset($statusCounts[$data['status']])) {
-                    $statusCounts[$data['status']]++;
-                } else {
-                    $statusCounts[$data['status']] = 1;
-                }
+                $status = $data['status'];
+                $statusCounts[$status] = ($statusCounts[$status] ?? 0) + 1;
             }
         }
 
         return $statusCounts;
     }
 
-    private function getUnitCounts($processedData)
+    private function getCountsByKey($processedData, $key)
     {
-        $unitCounts = [
-            'Farmasi' => 0,
-            'LABORATORIUM & PELAYANAN DARAH' => 0,
-            'IBS' => 0,
-        ];
-
+        $counts = [];
         foreach ($processedData as $data) {
-            if (isset($data['Nama Unit/Poli'])) {
-                $unit = $data['Nama Unit/Poli'];
-                if (!empty($unit)) {
-                    if (isset($unitCounts[$unit])) {
-                        $unitCounts[$unit]++;
-                    } else {
-                        $unitCounts[$unit] = 1;
-                    }
-                }
+            $value = $data[$key] ?? '';
+            if (!empty($value)) {
+                $counts[$value] = ($counts[$value] ?? 0) + 1;
             }
         }
-
-        return $unitCounts;
+        return $counts;
     }
 
     private function formatDateTime($dateTime)
     {
-        if ($dateTime instanceof \Carbon\Carbon) {
-            return $dateTime->toDateTimeString();
-        } elseif (is_string($dateTime)) {
-            return $dateTime;
-        }
-        return null;
+        return $dateTime instanceof \Carbon\Carbon ? $dateTime->toDateTimeString() : $dateTime;
     }
 }
