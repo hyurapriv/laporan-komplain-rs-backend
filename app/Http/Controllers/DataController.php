@@ -15,8 +15,9 @@ class DataController extends Controller
         $petugasCounts = $this->getPetugasCounts($processedData);
         $unitCounts = $this->getCountsByKey($processedData, 'Nama Unit/Poli');
         $averageResponseTime = $this->calculateAverageResponseTime($processedData);
+        $averageCompletedResponseTime = $this->calculateAverageCompletedResponseTime($processedData);
 
-        return view('index', compact('processedData', 'statusCounts', 'petugasCounts', 'unitCounts', 'averageResponseTime'));
+        return view('index', compact('processedData', 'statusCounts', 'petugasCounts', 'unitCounts', 'averageResponseTime', 'averageCompletedResponseTime'));
     }
 
     public function download()
@@ -33,7 +34,7 @@ class DataController extends Controller
         return Data::where('form_id', 3)->get()->map(function ($data) {
             $parsedJson = $data->json[0] ?? [];
             $extractedData = $this->extractDataFromJson($parsedJson);
-            
+
             $responTime = $this->calculateResponseTime($data->datetime_masuk, $data->datetime_selesai);
             return [
                 'id' => $data->id,
@@ -48,7 +49,7 @@ class DataController extends Controller
                 'Nama Unit/Poli' => $extractedData['namaUnit'],
                 'respon_time' => $responTime['formatted'],
                 'respon_time_minutes' => $responTime['minutes']
-                ];
+            ];
         })->toArray();
     }
 
@@ -84,7 +85,7 @@ class DataController extends Controller
         ];
 
         $petugasList = preg_split('/\s*[,&]\s*|\s+dan\s+/i', $petugas);
-        $normalizedList = array_map(function($name) use ($replacements) {
+        $normalizedList = array_map(function ($name) use ($replacements) {
             return $replacements[trim($name)] ?? trim($name);
         }, $petugasList);
 
@@ -143,7 +144,7 @@ class DataController extends Controller
     {
         return $dateTime instanceof \Carbon\Carbon ? $dateTime->toDateTimeString() : $dateTime;
     }
-    
+
     private function calculateResponseTime($datetimeMasuk, $datetimeSelesai)
     {
         if (!$datetimeMasuk || !$datetimeSelesai) {
@@ -187,10 +188,34 @@ class DataController extends Controller
         }
 
         $averageMinutes = $countValidResponseTimes > 0 ? $totalResponseTime / $countValidResponseTimes : 0;
-        
+
         return [
             'minutes' => round($averageMinutes, 2),
             'formatted' => $this->formatMinutes(round($averageMinutes))
         ];
-    }   
+    }
+
+    private function calculateAverageCompletedResponseTime($processedData)
+    {
+        $totalResponseTime = 0;
+        $countCompleted = 0;
+
+        foreach ($processedData as $data) {
+            if ($data['status'] === 'Selesai' && $data['respon_time_minutes'] !== null) {
+                $totalResponseTime += $data['respon_time_minutes'];
+                $countCompleted++;
+            }
+        }
+
+        if ($countCompleted === 0) {
+            return ['minutes' => 0, 'formatted' => 'N/A'];
+        }
+
+        $averageMinutes = $totalResponseTime / $countCompleted;
+
+        return [
+            'minutes' => round($averageMinutes, 2),
+            'formatted' => $this->formatMinutes(round($averageMinutes))
+        ];
+    }
 }

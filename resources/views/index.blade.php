@@ -1,65 +1,46 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Processed Data</title>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@10"></script>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            margin: 0;
-            padding: 20px;
-            background-color: #f4f4f4;
-        }
-        h1, h2 {
-            color: #333;
-        }
-        pre {
-            background-color: #fff;
-            border: 1px solid #ddd;
+        /* ... (previous styles remain the same) ... */
+        .summary-box {
+            background-color: #e9f7ef;
+            border: 1px solid #28a745;
             border-radius: 5px;
             padding: 15px;
-            overflow-x: auto;
-        }
-        button {
-            background-color: #4CAF50;
-            border: none;
-            color: white;
-            padding: 15px 32px;
-            text-align: center;
-            text-decoration: none;
-            display: inline-block;
-            font-size: 16px;
-            margin: 4px 2px;
-            cursor: pointer;
-            border-radius: 5px;
-        }
-        ul {
-            list-style-type: none;
-            padding: 0;
-        }
-        li {
-            margin: 5px 0;
+            margin-bottom: 20px;
         }
     </style>
 </head>
+
 <body>
     <h1>Processed Data</h1>
-    
+
+    <div class="summary-box">
+        <h2>Summary</h2>
+        <p>Average Response Time (All): {{ $averageResponseTime['formatted'] }} ({{ $averageResponseTime['minutes'] }}
+            minutes)</p>
+        <p>Average Response Time (Completed Tasks): {{ $averageCompletedResponseTime['formatted'] }}
+            ({{ $averageCompletedResponseTime['minutes'] }} minutes)</p>
+    </div>
+
     <h2>Status Counts</h2>
     <ul>
-    @foreach ($statusCounts as $status => $count)
-        <li>{{ $status }}: {{ $count }}</li>
-    @endforeach
+        @foreach ($statusCounts as $status => $count)
+            <li>{{ $status }}: {{ $count }}</li>
+        @endforeach
     </ul>
 
     <h2>Petugas Counts</h2>
     <ul>
-    @foreach ($petugasCounts as $petugas => $count)
-        <li>{{ $petugas }}: {{ $count }}</li>
-    @endforeach
+        @foreach ($petugasCounts as $petugas => $count)
+            <li>{{ $petugas }}: {{ $count }}</li>
+        @endforeach
     </ul>
 
     @if (!empty($processedData))
@@ -72,37 +53,39 @@
         <p>Data tidak tersedia atau terjadi kesalahan dalam pemrosesan.</p>
     @endif
 
+
     <script>
-    function downloadProcessedData() {
-        fetch('{{ route('data.download') }}')
-            .then(response => response.blob())
-            .then(blob => {
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'processed_data.json';
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Data berhasil diunduh',
-                    text: 'File processed_data.json berhasil diunduh!',
-                    timer: 3000,
-                    timerProgressBar: true,
-                    showConfirmButton: false
+        function downloadProcessedData() {
+            fetch('{{ route('data.download') }}')
+                .then(response => response.blob())
+                .then(blob => {
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'processed_data.json';
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Data berhasil diunduh',
+                        text: 'File processed_data.json berhasil diunduh!',
+                        timer: 3000,
+                        timerProgressBar: true,
+                        showConfirmButton: false
+                    });
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Oops...',
+                        text: 'Terjadi kesalahan saat mengunduh data!',
+                    });
                 });
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Oops...',
-                    text: 'Terjadi kesalahan saat mengunduh data!',
-                });
-            });
-    }
+        }
     </script>
 </body>
+
 </html>
