@@ -17,7 +17,7 @@ class DataController extends Controller
         $petugasCounts = $this->getPetugasCounts($processedData);
         $unitCounts = $this->getUnitCounts($processedData);
 
-        return view('index', compact('processedData', 'statusCounts', 'petugasCounts','unitCounts'));
+        return view('index', compact('processedData', 'statusCounts', 'petugasCounts', 'unitCounts'));
     }
 
     public function download()
@@ -81,16 +81,28 @@ class DataController extends Controller
             'Adikaka' => 'Adika',
             'adikaka' => 'Adika',
             'dika' => 'Adika',
+            'Dika' => 'Adika',
             'dikq' => 'Adika',
             'AAdika' => 'Adika',
             'virgie' => 'Virgie',
+            'Vi' => 'Virgie',
+            'vi' => 'Virgie',
+            // Tambahkan lebih banyak jika diperlukan
         ];
 
-        foreach ($replacements as $oldName => $newName) {
-            $petugas = str_replace($oldName, $newName, $petugas);
+        $petugasList = preg_split('/\s*[,&]\s*|\s+dan\s+/i', $petugas);
+        $normalizedList = [];
+
+        foreach ($petugasList as $name) {
+            $trimmedName = trim($name);
+            if (array_key_exists($trimmedName, $replacements)) {
+                $normalizedList[] = $replacements[$trimmedName];
+            } else {
+                $normalizedList[] = $trimmedName;
+            }
         }
 
-        return $petugas;
+        return implode(', ', $normalizedList);
     }
 
     private function getPetugasCounts($processedData)
@@ -106,12 +118,15 @@ class DataController extends Controller
 
         foreach ($processedData as $data) {
             // Mengambil nama petugas dan menghilangkan spasi berlebih
-            $petugasList = array_map('trim', explode(',', $data['Nama Petugas']));
-            $uniquePetugas = array_unique($petugasList);
+            $petugasList = preg_split('/\s*[,&]\s*|\s+dan\s+/i', $data['Nama Petugas']);
+            $uniquePetugas = array_unique(array_map('trim', $petugasList));
 
             foreach ($uniquePetugas as $petugas) {
-                if (isset($petugasCounts[$petugas])) {
-                    $petugasCounts[$petugas]++;
+                $normalizedPetugas = $this->normalizePetugasNames($petugas);
+                if (isset($petugasCounts[$normalizedPetugas])) {
+                    $petugasCounts[$normalizedPetugas]++;
+                } else {
+                    $petugasCounts[$normalizedPetugas] = 1; // Jika petugas baru, inisialisasi hitungan
                 }
             }
         }
@@ -148,7 +163,7 @@ class DataController extends Controller
         return $statusCounts;
     }
 
-    private function getunitCounts($processedData)
+    private function getUnitCounts($processedData)
     {
         $unitCounts = [
             'Farmasi' => 0,
