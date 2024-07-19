@@ -74,65 +74,69 @@ class DataController extends Controller
     }
 
     private function normalizePetugasNames($petugas)
-    {
-        $replacements = [
-            'Adi' => 'Adika',
-            'Adika Wicaksana' => 'Adika',
-            'Adikaka' => 'Adika',
-            'adikaka' => 'Adika',
-            'dika' => 'Adika',
-            'Dika' => 'Adika',
-            'dikq' => 'Adika',
-            'AAdika' => 'Adika',
-            'virgie' => 'Virgie',
-            'Vi' => 'Virgie',
-            'vi' => 'Virgie',
-            // Tambahkan lebih banyak jika diperlukan
-        ];
+{
+    $replacements = [
+        'Adi' => 'Adika',
+        'Adika Wicaksana' => 'Adika',
+        'Adikaka' => 'Adika',
+        'adikaka' => 'Adika',
+        'dika' => 'Adika',
+        'Dika' => 'Adika',
+        'dikq' => 'Adika',
+        'Dikq' => 'Adika',
+        'AAdika' => 'Adika',
+        'virgie' => 'Virgie',
+        'Vi' => 'Virgie',
+        'vi' => 'Virgie',
+        'Virgie Dika' => 'Virgie, Adika',
+        'Virgie dikq' => 'Virgie, Adika',
+        // Tambahkan lebih banyak jika diperlukan
+    ];
 
-        $petugasList = preg_split('/\s*[,&]\s*|\s+dan\s+/i', $petugas);
-        $normalizedList = [];
+    $petugasList = preg_split('/\s*[,&]\s*|\s+dan\s+/i', $petugas);
+    $normalizedList = [];
 
-        foreach ($petugasList as $name) {
-            $trimmedName = trim($name);
-            if (array_key_exists($trimmedName, $replacements)) {
-                $normalizedList[] = $replacements[$trimmedName];
-            } else {
-                $normalizedList[] = $trimmedName;
-            }
+    foreach ($petugasList as $name) {
+        $trimmedName = trim($name);
+        if (array_key_exists($trimmedName, $replacements)) {
+            $normalizedNames = explode(', ', $replacements[$trimmedName]);
+            $normalizedList = array_merge($normalizedList, $normalizedNames);
+        } else {
+            $normalizedList[] = $trimmedName;
         }
-
-        return implode(', ', $normalizedList);
     }
 
-    private function getPetugasCounts($processedData)
-    {
-        $petugasCounts = [
-            'Ganang' => 0,
-            'Agus' => 0,
-            'Ali Muhson' => 0,
-            'Virgie' => 0,
-            'Bayu' => 0,
-            'Adika' => 0,
-        ];
+    return implode(', ', array_unique($normalizedList));
+}
 
-        foreach ($processedData as $data) {
-            // Mengambil nama petugas dan menghilangkan spasi berlebih
-            $petugasList = preg_split('/\s*[,&]\s*|\s+dan\s+/i', $data['Nama Petugas']);
-            $uniquePetugas = array_unique(array_map('trim', $petugasList));
+private function getPetugasCounts($processedData)
+{
+    $petugasCounts = [
+        'Ganang' => 0,
+        'Agus' => 0,
+        'Ali Muhson' => 0,
+        'Virgie' => 0,
+        'Bayu' => 0,
+        'Adika' => 0,
+    ];
 
-            foreach ($uniquePetugas as $petugas) {
-                $normalizedPetugas = $this->normalizePetugasNames($petugas);
-                if (isset($petugasCounts[$normalizedPetugas])) {
-                    $petugasCounts[$normalizedPetugas]++;
-                } else {
-                    $petugasCounts[$normalizedPetugas] = 1; // Jika petugas baru, inisialisasi hitungan
-                }
+    foreach ($processedData as $data) {
+        $petugasList = explode(', ', $data['Nama Petugas']);
+        $uniquePetugas = array_unique($petugasList);
+
+        foreach ($uniquePetugas as $petugas) {
+            $normalizedPetugas = trim($petugas);
+            if (isset($petugasCounts[$normalizedPetugas])) {
+                $petugasCounts[$normalizedPetugas]++;
             }
         }
-
-        return $petugasCounts;
     }
+
+    // Menghapus entri dengan nilai 0
+    $petugasCounts = array_filter($petugasCounts);
+
+    return $petugasCounts;
+}
 
     private function getStatusCounts($processedData)
     {
