@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Data;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Storage;
 
 class DataController extends Controller
@@ -13,8 +14,9 @@ class DataController extends Controller
         $statusCounts = $this->getStatusCounts($processedData);
         $petugasCounts = $this->getPetugasCounts($processedData);
         $unitCounts = $this->getCountsByKey($processedData, 'Nama Unit/Poli');
+        $averageResponseTime = $this->calculateAverageResponseTime($processedData);
 
-        return view('index', compact('processedData', 'statusCounts', 'petugasCounts', 'unitCounts'));
+        return view('index', compact('processedData', 'statusCounts', 'petugasCounts', 'unitCounts', 'averageResponseTime'));
     }
 
     public function download()
@@ -31,7 +33,8 @@ class DataController extends Controller
         return Data::where('form_id', 3)->get()->map(function ($data) {
             $parsedJson = $data->json[0] ?? [];
             $extractedData = $this->extractDataFromJson($parsedJson);
-
+            
+            $responTime = $this->calculateResponseTime($data->datetime_masuk, $data->datetime_selesai);
             return [
                 'id' => $data->id,
                 'Nama Pelapor' => $extractedData['namaPelapor'],
@@ -42,8 +45,10 @@ class DataController extends Controller
                 'datetime_selesai' => $this->formatDateTime($data->datetime_selesai),
                 'status' => $extractedData['status'] ?? $data->status ?? '',
                 'is_pending' => $data->is_pending,
-                'Nama Unit/Poli' => $extractedData['namaUnit']
-            ];
+                'Nama Unit/Poli' => $extractedData['namaUnit'],
+                'respon_time' => $responTime['formatted'],
+                'respon_time_minutes' => $responTime['minutes']
+                ];
         })->toArray();
     }
 
@@ -138,4 +143,54 @@ class DataController extends Controller
     {
         return $dateTime instanceof \Carbon\Carbon ? $dateTime->toDateTimeString() : $dateTime;
     }
+    
+    private function calculateResponseTime($datetimeMasuk, $datetimeSelesai)
+    {
+        if (!$datetimeMasuk || !$datetimeSelesai) {
+            return ['minutes' => null, 'formatted' => 'N/A'];
+        }
+
+        $masuk = Carbon::parse($datetimeMasuk);
+        $selesai = Carbon::parse($datetimeSelesai);
+
+        // Calculate the difference in minutes
+        $diffInMinutes = $masuk->diffInMinutes($selesai);
+
+        return [
+            'minutes' => $diffInMinutes,
+            'formatted' => $this->formatMinutes($diffInMinutes)
+        ];
+    }
+
+    private function formatMinutes($minutes)
+    {
+        $hours = floor($minutes / 60);
+        $remainingMinutes = $minutes % 60;
+
+        if ($hours > 0) {
+            return sprintf("%d jam %d menit", $hours, $remainingMinutes);
+        } else {
+            return sprintf("%d menit", $remainingMinutes);
+        }
+    }
+
+    private function calculateAverageResponseTime($processedData)
+    {
+        $totalResponseTime = 0;
+        $countValidResponseTimes = 0;
+
+        foreach ($processedData as $data) {
+            if ($data['respon_time_minutes'] !== null) {
+                $totalResponseTime += $data['respon_time_minutes'];
+                $countValidResponseTimes++;
+            }
+        }
+
+        $averageMinutes = $countValidResponseTimes > 0 ? $totalResponseTime / $countValidResponseTimes : 0;
+        
+        return [
+            'minutes' => round($averageMinutes, 2),
+            'formatted' => $this->formatMinutes(round($averageMinutes))
+        ];
+    }   
 }
