@@ -215,6 +215,7 @@ class DataController extends Controller
             $processedData = $this->getProcessedData();
             $statusCounts = $this->getStatusCounts($processedData);
             $averageResponseTime = $this->calculateAverageResponseTime($processedData);
+            $totalComplaints = count($processedData); // Calculate total complaints
 
             return [
                 'terkirim' => $statusCounts['Terkirim'] ?? 0,
@@ -222,6 +223,7 @@ class DataController extends Controller
                 'selesai' => $statusCounts['Selesai'] ?? 0,
                 'pending' => $statusCounts['pending'] ?? 0,
                 'responTime' => $averageResponseTime['formatted'],
+                'total' => $totalComplaints,
             ];
         });
 
