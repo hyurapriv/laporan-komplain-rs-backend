@@ -74,13 +74,34 @@
         @endforeach
     </ul>
 
-    <h2>Unit/Poli</h2>
-    <ul>
-        @foreach ($unitCounts as $unit => $count)
-            <li>{{ $unit }}: {{ $count }}</li>
-        @endforeach
-    </ul>
+    <h2>Unit Klinis</h2>
+    @if (!empty($clinicalUnits))
+        <ul>
+            @foreach ($clinicalUnits as $unit => $count)
+                <li>{{ $unit }}: {{ $count }}</li>
+            @endforeach
+        </ul>
+    @else
+        <p>No clinical units found.</p>
+    @endif
 
+    <h1>Unit Non-Klinis</h1>
+    @if (!empty($nonClinicalUnits))
+        <ul>
+            @foreach ($nonClinicalUnits as $unit => $count)
+                <li>{{ $unit }}: {{ $count }}</li>
+            @endforeach
+        </ul>
+    @else
+        <p>No non-clinical units found.</p>
+    @endif
+
+    <h1>Unit Lainnya</h1>
+    @if (!empty($otherUnits))
+        <p>{{ $otherUnits }}</p>
+    @else
+        <p>No other units found.</p>
+    @endif
     @if (!empty($processedData))
         <button onclick="downloadProcessedData()">Download Processed Data</button>
 

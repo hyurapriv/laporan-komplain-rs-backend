@@ -27,7 +27,32 @@ class DataController extends Controller
         $averageResponseTime = $this->calculateAverageResponseTime($processedData);
         $averageCompletedResponseTime = $this->calculateAverageCompletedResponseTime($processedData);
 
-        return view('index', compact('processedData', 'statusCounts', 'petugasCounts', 'unitCounts', 'averageResponseTime', 'averageCompletedResponseTime'));
+        $clinicalUnits = array_filter($unitCounts['Klinis'], function ($count) {
+            return $count > 0;
+        });
+    
+        $nonClinicalUnits = array_filter($unitCounts['Non-Klinis'], function ($count) {
+            return $count > 0;
+        });
+    
+        $otherUnits = $unitCounts['Lainnya'] ?? 0;
+    
+        // Use dd() to debug and check if the variables have the expected data
+        
+    
+
+       
+        return view('index', compact(
+            'processedData',
+            'statusCounts',
+            'petugasCounts',
+            'clinicalUnits',
+            'nonClinicalUnits',
+            'otherUnits',
+            'unitCounts',
+            'averageResponseTime',
+            'averageCompletedResponseTime'
+        ));
     }
 
     public function download()
@@ -62,6 +87,8 @@ class DataController extends Controller
             ];
         })->toArray();
     }
+
+    
 
     private function extractDataFromJson($parsedJson)
     {
@@ -107,13 +134,13 @@ class DataController extends Controller
         // Regex pattern untuk mencocokkan frasa yang mengandung "poli mata"
         $pattern = '/\b(?:poli\s*mata(?:\s*[\w\s]*)?)\b/i';
 
-    // Jika unit sesuai dengan pola, kembalikan "Poli Mata"
-    if (preg_match($pattern, strtolower($unit))) {
-        return 'Poli Mata';
-    }
+        // Jika unit sesuai dengan pola, kembalikan "Poli Mata"
+        if (preg_match($pattern, strtolower($unit))) {
+            return 'Poli Mata';
+        }
 
-    // Jika tidak sesuai dengan pola, kembalikan unit dengan kapitalisasi awal
-    return ucfirst(strtolower($unit));
+        // Jika tidak sesuai dengan pola, kembalikan unit dengan kapitalisasi awal
+        return ucfirst(strtolower($unit));
     }
 
     private function getPetugasCounts($processedData)
@@ -154,62 +181,83 @@ class DataController extends Controller
 
     private function getUnitCounts($processedData)
     {
-        // Definisikan kata kunci utama untuk setiap unit/poli
+        // Definisikan kata kunci utama untuk setiap unit/poli berdasarkan kelompok
         $keywords = [
-            'Rekam Medis' => ['rekam medis', 'rm'],
-            'Poli Mata' => ['mata'],
-            'Poli Bedah' => ['bedah'],
-            'Poli Obgyn' => ['obgyn'],
-            'Poli THT' => ['tht'],
-            'Poli Orthopedi' => ['orthopedi', 'ortopedi'],
-            'Poli Jantung' => ['jantung'],
-            'Poli Gigi' => ['gigi'],
-            'ICU' => ['icu'],
-            'Radiologi' => ['radiologi'],
-            'Perinatologi' => ['perinatologi', 'perina'],
-            'Rehabilitasi Medik' => ['rehabilitasi medik'],
-            'IGD' => ['igd'],
-            'SIMRS' => ['simrs'],
-            'Kesehatan Lingkungan' => ['kesehatan lingkungan', 'kesling'],
-            'Farmasi' => ['farmasi'],
-            'IBS' => ['ibs'],
-            'UKM' => ['ukm'],
-            'Litbang' => ['litbang'],
-            'Laboratorium & Pelayanan Darah' => ['laboratorium & pelayanan darah', 'laboratorium'],
-            'Kasir' => ['kasir'],
-            'IT' => ['it'],
-            'Jamkes/Pojok JKN' => ['jamkes', 'pojok jkn', 'pojok jkn / loket bpjs', 'jamkes / pojok jkn'],
-            'Loket TPPRI' => ['loket tppri', 'tppri', 'tppri timur'],
-            'Anggrek' => ['anggrek', 'unit anggrek'],
-            'Gizi' => ['gizi'],
-            'Ruang Akreditasi' => ['ruang akreditasi'],
-            'Ranap' => ['ranap'],
-            'TSE' => ['tse'],
-            'Maxime Deserunt Cumq' => ['maxime deserunt cumq'],
-            'Veritatis Voluptatem' => ['veritatis voluptatem'],
-            'Voluptas Enim Cupida' => ['voluptas enim cupida'],
-            'Enim Id Unde Sequi E' => ['enim id unde sequi e'],
-            'Est Iste Quam Dolore' => ['est iste quam dolore'],
-            'Bugenvil' => ['bugenvil'],
-            'Tes' => ['tes'],
+            // Kelompok Unit Klinis
+            'Klinis' => [
+                'Rekam Medis' => ['rekam medis', 'rm'],
+                'Poli Mata' => ['mata'],
+                'Poli Bedah' => ['bedah'],
+                'Poli Obgyn' => ['obgyn'],
+                'Poli THT' => ['tht'],
+                'Poli Orthopedi' => ['orthopedi', 'ortopedi'],
+                'Poli Jantung' => ['jantung'],
+                'Poli Gigi' => ['gigi'],
+                'ICU' => ['icu'],
+                'Radiologi' => ['radiologi'],
+                'Perinatologi' => ['perinatologi', 'perina'],
+                'Rehabilitasi Medik' => ['rehabilitasi medik'],
+                'IGD' => ['igd'],
+            ],
+            // Kelompok Unit Non-Klinis
+            'Non-Klinis' => [
+                'Kesehatan Lingkungan' => ['kesehatan lingkungan', 'kesling'],
+                'Farmasi' => ['farmasi'],
+                'IBS' => ['ibs'],
+                'UKM' => ['ukm'],
+                'Litbang' => ['litbang'],
+                'Laboratorium & Pelayanan Darah' => ['laboratorium & pelayanan darah', 'laboratorium'],
+                'Kasir' => ['kasir'],
+                'IT' => ['it'],
+                'Jamkes/Pojok JKN' => ['jamkes', 'pojok jkn', 'pojok jkn / loket bpjs', 'jamkes / pojok jkn'],
+                'Loket TPPRI' => ['loket tppri', 'tppri', 'tppri timur'],
+                'Anggrek' => ['anggrek', 'unit anggrek'],
+                'Gizi' => ['gizi'],
+                'Ruang Akreditasi' => ['ruang akreditasi'],
+                'Ranap' => ['ranap'],
+                'TSE' => ['tse'],
+                'Maxime Deserunt Cumq' => ['maxime deserunt cumq'],
+                'Veritatis Voluptatem' => ['veritatis voluptatem'],
+                'Voluptas Enim Cupida' => ['voluptas enim cupida'],
+                'Enim Id Unde Sequi E' => ['enim id unde sequi e'],
+                'Est Iste Quam Dolore' => ['est iste quam dolore'],
+                'Bugenvil' => ['bugenvil'],
+                'Tes' => ['tes'],
+            ],
         ];
 
-        // Inisialisasi unitCounts dengan semua unit yang tersedia
-        $unitCounts = array_fill_keys(array_keys($keywords), 0);
-        $unitCounts['Lainnya'] = 0;
+        // Inisialisasi unitCounts dengan semua kelompok dan unit
+        $unitCounts = [
+            'Klinis' => array_fill_keys(array_keys($keywords['Klinis']), 0),
+            'Non-Klinis' => array_fill_keys(array_keys($keywords['Non-Klinis']), 0),
+            'Lainnya' => 0,
+        ];
 
         // Proses setiap data
         foreach ($processedData as $data) {
             $unitName = strtolower($data['Nama Unit/Poli']);
             $matched = false;
 
-            // Cek setiap kata kunci
-            foreach ($keywords as $unit => $words) {
+            // Cek setiap kata kunci di kelompok Klinis
+            foreach ($keywords['Klinis'] as $unit => $words) {
                 foreach ($words as $word) {
                     if (strpos($unitName, $word) !== false) {
-                        $unitCounts[$unit]++;
+                        $unitCounts['Klinis'][$unit]++;
                         $matched = true;
                         break 2; // Hentikan pencarian setelah menemukan kecocokan
+                    }
+                }
+            }
+
+            // Cek setiap kata kunci di kelompok Non-Klinis jika belum cocok
+            if (!$matched) {
+                foreach ($keywords['Non-Klinis'] as $unit => $words) {
+                    foreach ($words as $word) {
+                        if (strpos($unitName, $word) !== false) {
+                            $unitCounts['Non-Klinis'][$unit]++;
+                            $matched = true;
+                            break 2; // Hentikan pencarian setelah menemukan kecocokan
+                        }
                     }
                 }
             }
