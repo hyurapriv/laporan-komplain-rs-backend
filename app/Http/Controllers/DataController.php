@@ -143,7 +143,7 @@ class DataController extends Controller
 
     private function formatDateTime($dateTime)
     {
-        return $dateTime instanceof \Carbon\Carbon ? $dateTime->toDateTimeString() : $dateTime;
+        return $dateTime instanceof Carbon ? $dateTime->toDateTimeString() : $dateTime;
     }
 
     private function calculateResponseTime($datetimeMasuk, $datetimeSelesai)
@@ -162,18 +162,6 @@ class DataController extends Controller
             'minutes' => $diffInMinutes,
             'formatted' => $this->formatMinutes($diffInMinutes)
         ];
-    }
-
-    private function formatMinutes($minutes)
-    {
-        $hours = floor($minutes / 60);
-        $remainingMinutes = $minutes % 60;
-
-        if ($hours > 0) {
-            return sprintf("%d jam %d menit", $hours, $remainingMinutes);
-        } else {
-            return sprintf("%d menit", $remainingMinutes);
-        }
     }
 
     private function calculateAverageResponseTime($processedData)
@@ -238,5 +226,17 @@ class DataController extends Controller
         });
 
         return response()->json($cachedData);
+    }
+
+    private function formatMinutes($minutes)
+    {
+        $hours = floor($minutes / 60);
+        $remainingMinutes = $minutes % 60;
+
+        if ($hours > 0) {
+            return sprintf("%d jam %d menit", $hours, $remainingMinutes);
+        } else {
+            return sprintf("%d menit", $remainingMinutes);
+        }
     }
 }
