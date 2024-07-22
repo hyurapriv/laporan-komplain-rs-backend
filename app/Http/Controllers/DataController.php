@@ -30,18 +30,18 @@ class DataController extends Controller
         $clinicalUnits = array_filter($unitCounts['Klinis'], function ($count) {
             return $count > 0;
         });
-    
+
         $nonClinicalUnits = array_filter($unitCounts['Non-Klinis'], function ($count) {
             return $count > 0;
         });
-    
-        $otherUnits = $unitCounts['Lainnya'] ?? 0;
-    
-        // Use dd() to debug and check if the variables have the expected data
-        
-    
 
-       
+        $otherUnits = $unitCounts['Lainnya'] ?? 0;
+
+        // Use dd() to debug and check if the variables have the expected data
+
+
+
+
         return view('index', compact(
             'processedData',
             'statusCounts',
@@ -88,7 +88,7 @@ class DataController extends Controller
         })->toArray();
     }
 
-    
+
 
     private function extractDataFromJson($parsedJson)
     {
@@ -215,13 +215,15 @@ class DataController extends Controller
                 'Gizi' => ['gizi'],
                 'Ruang Akreditasi' => ['ruang akreditasi'],
                 'Ranap' => ['ranap'],
+                'Bugenvil' => ['bugenvil'],
+            ],
+            'Lainnya' => [
                 'TSE' => ['tse'],
                 'Maxime Deserunt Cumq' => ['maxime deserunt cumq'],
                 'Veritatis Voluptatem' => ['veritatis voluptatem'],
                 'Voluptas Enim Cupida' => ['voluptas enim cupida'],
                 'Enim Id Unde Sequi E' => ['enim id unde sequi e'],
                 'Est Iste Quam Dolore' => ['est iste quam dolore'],
-                'Bugenvil' => ['bugenvil'],
                 'Tes' => ['tes'],
             ],
         ];
@@ -230,7 +232,7 @@ class DataController extends Controller
         $unitCounts = [
             'Klinis' => array_fill_keys(array_keys($keywords['Klinis']), 0),
             'Non-Klinis' => array_fill_keys(array_keys($keywords['Non-Klinis']), 0),
-            'Lainnya' => 0,
+            'Lainnya' => array_fill_keys(array_keys($keywords['Lainnya']), 0),
         ];
 
         // Proses setiap data
@@ -262,9 +264,22 @@ class DataController extends Controller
                 }
             }
 
+            if (!$matched) {
+                foreach ($keywords['Lainnya'] as $unit => $words) {
+                    foreach ($words as $word) {
+                        if (strpos($unitName, $word) !== false) {
+                            $unitCounts['Lainnya'][$unit]++;
+                            $matched = true;
+                            break 2; // Hentikan pencarian setelah menemukan kecocokan
+                        }
+                    }
+                }
+            }
+
+
             // Jika tidak ada kecocokan, masukkan ke kategori 'Lainnya'
             if (!$matched) {
-                $unitCounts['Lainnya']++;
+                $unitCounts['Lainnya']['Lainnya']++;
             }
         }
 
