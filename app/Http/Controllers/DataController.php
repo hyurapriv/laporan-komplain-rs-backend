@@ -94,17 +94,17 @@ class DataController extends Controller
     }
 
     private function normalizeUnitNames($unit)
-    { 
-        // Regex pattern untuk mencocokkan frasa yang mengandung "poli mata"
-        $pattern = '/\b(?:poli\s*mata(?:\s*[\w\s]*)?)\b/i';
+    {
+    // Regex pattern untuk mencocokkan frasa yang mengandung "poli mata"
+    $pattern = '/\b(?:poli\s*mata(?:\s*[\w\s]*)?)\b/i';
 
-        // Jika unit sesuai dengan pola, kembalikan "Poli Mata"
-        if (preg_match($pattern, strtolower($unit))) {
-            return 'Poli Mata';
-        }
+    // Jika unit sesuai dengan pola, kembalikan "Poli Mata"
+    if (preg_match($pattern, strtolower($unit))) {
+        return 'Poli Mata';
+    }
 
-        // Jika tidak sesuai dengan pola, kembalikan unit dengan kapitalisasi awal
-        return ucfirst(strtolower($unit));
+    // Jika tidak sesuai dengan pola, kembalikan unit dengan kapitalisasi awal
+    return ucfirst(strtolower($unit));
     }
 
     private function getPetugasCounts($processedData)
