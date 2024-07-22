@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Data;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 
 class DataController extends Controller
@@ -221,16 +222,21 @@ class DataController extends Controller
 
     public function getKomplainData()
     {
-        $processedData = $this->getProcessedData();
-        $statusCounts = $this->getStatusCounts($processedData);
-        $averageResponseTime = $this->calculateAverageResponseTime($processedData);
+        // Caching data for 5 minutes
+        $cachedData = Cache::remember('komplain-data', 5 * 60, function () {
+            $processedData = $this->getProcessedData();
+            $statusCounts = $this->getStatusCounts($processedData);
+            $averageResponseTime = $this->calculateAverageResponseTime($processedData);
 
-        return response()->json([
-            'terkirim' => $statusCounts['Terkirim'] ?? 0,
-            'proses' => $statusCounts['Dalam Pengerjaan / Pengecekan Petugas'] ?? 0,
-            'selesai' => $statusCounts['Selesai'] ?? 0,
-            'pending' => $statusCounts['pending'] ?? 0,
-            'responTime' => $averageResponseTime['minutes'],
-        ]);
+            return [
+                'terkirim' => $statusCounts['Terkirim'] ?? 0,
+                'proses' => $statusCounts['Dalam Pengerjaan / Pengecekan Petugas'] ?? 0,
+                'selesai' => $statusCounts['Selesai'] ?? 0,
+                'pending' => $statusCounts['pending'] ?? 0,
+                'responTime' => $averageResponseTime['minutes'],
+            ];
+        });
+
+        return response()->json($cachedData);
     }
 }
