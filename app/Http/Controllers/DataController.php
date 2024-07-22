@@ -233,7 +233,7 @@ class DataController extends Controller
                 'proses' => $statusCounts['Dalam Pengerjaan / Pengecekan Petugas'] ?? 0,
                 'selesai' => $statusCounts['Selesai'] ?? 0,
                 'pending' => $statusCounts['pending'] ?? 0,
-                'responTime' => $averageResponseTime['minutes'],
+                'responTime' => $averageResponseTime['formatted'],
             ];
         });
 
