@@ -215,14 +215,18 @@ class DataController extends Controller
                 'Gizi' => ['gizi'],
                 'Ruang Akreditasi' => ['ruang akreditasi'],
                 'Ranap' => ['ranap'],
+                'Bugenvil' => ['bugenvil'],
+                'Tes' => ['tes'],
+            ],
+            // Kemlompok Unit Lainnya
+            'Unit Lainnya' => [
+                'IT' => ['it'],
                 'TSE' => ['tse'],
                 'Maxime Deserunt Cumq' => ['maxime deserunt cumq'],
                 'Veritatis Voluptatem' => ['veritatis voluptatem'],
                 'Voluptas Enim Cupida' => ['voluptas enim cupida'],
                 'Enim Id Unde Sequi E' => ['enim id unde sequi e'],
                 'Est Iste Quam Dolore' => ['est iste quam dolore'],
-                'Bugenvil' => ['bugenvil'],
-                'Tes' => ['tes'],
             ],
         ];
 
