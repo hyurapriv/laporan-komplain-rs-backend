@@ -47,7 +47,7 @@ class DataController extends Controller
                 'datetime_selesai' => $this->formatDateTime($data->datetime_selesai),
                 'status' => $extractedData['status'] ?? $data->status ?? '',
                 'is_pending' => $data->is_pending,
-                'Nama Unit/Poli' => $extractedData['namaUnit'],
+                'Nama Unit/Poli' => $this->normalizeUnitNames($extractedData['namaUnit']),
                 'respon_time' => $responTime['formatted'],
                 'respon_time_minutes' => $responTime['minutes']
             ];
@@ -93,6 +93,20 @@ class DataController extends Controller
         return implode(', ', array_unique($normalizedList));
     }
 
+    private function normalizeUnitNames($unit)
+    { 
+        // Regex pattern untuk mencocokkan frasa yang mengandung "poli mata"
+        $pattern = '/\b(?:poli\s*mata(?:\s*[\w\s]*)?)\b/i';
+
+        // Jika unit sesuai dengan pola, kembalikan "Poli Mata"
+        if (preg_match($pattern, strtolower($unit))) {
+            return 'Poli Mata';
+        }
+
+        // Jika tidak sesuai dengan pola, kembalikan unit dengan kapitalisasi awal
+        return ucfirst(strtolower($unit));
+    }
+
     private function getPetugasCounts($processedData)
     {
         $petugasCounts = array_fill_keys(['Ganang', 'Agus', 'Ali Muhson', 'Virgie', 'Bayu', 'Adika'], 0);
@@ -129,13 +143,35 @@ class DataController extends Controller
         return $statusCounts;
     }
 
+    private function getUnitCounts($processedData)
+    {
+        $units = [
+            'Rekam Medis', 'Kesehatan Lingkungan', 'Poli Bedah', 'Poli Obgyn', 'Perinatologi', 
+            'Farmasi', 'IBS', 'UKM', 'Litbang', 'Laboratorium & Pelayanan Darah', 'Kasir', 
+            'IT', 'Kesling', 'Veritatis Voluptatem', 'RM', 'Jamkes/Pojok JKN', 'Loket TPPRI', 
+            'Angreek', 'UKM Litbang', 'Voluptas Enim Cupida', 'TPPRI', 'IFRS', 'Rehabilitas Medik', 
+            'Poli THT', 'Radiologi', 'Poli Ortho Pedi', 'ICU', 'Poli Mata', 'Klinik Jantung', 
+            'Gizi', 'Poli Gigi', 'Perina', 'Bugenvil'  
+        ];
+
+        $unitCounts = array_fill_keys($units, 0);
+
+        foreach ($processedData as $data) {
+            $unit = $data['Nama Unit/Poli'];
+            if (isset($unitCounts[$unit])) {
+                $unitCounts[$unit]++;
+            }
+        }
+    }
+
     private function getCountsByKey($processedData, $key)
     {
         $counts = [];
         foreach ($processedData as $data) {
             $value = $data[$key] ?? '';
             if (!empty($value)) {
-                $counts[$value] = ($counts[$value] ?? 0) + 1;
+                $normalizedValue = strtolower($value);
+                $counts[$normalizedValue] = ($counts[$normalizedValue] ?? 0) + 1;
             }
         }
         return $counts;

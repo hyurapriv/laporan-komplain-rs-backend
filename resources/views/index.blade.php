@@ -7,13 +7,46 @@
     <title>Processed Data</title>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@10"></script>
     <style>
-        /* ... (previous styles remain the same) ... */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+
+        h1, h2 {
+            color: #333;
+        }
+
         .summary-box {
             background-color: #e9f7ef;
             border: 1px solid #28a745;
             border-radius: 5px;
             padding: 15px;
             margin-bottom: 20px;
+        }
+
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        li {
+            margin: 5px 0;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #0056b3;
         }
     </style>
 </head>
@@ -22,37 +55,39 @@
     <h1>Processed Data</h1>
 
     <div class="summary-box">
-        <h2>Summary</h2>
-        <p>Average Response Time (All): {{ $averageResponseTime['formatted'] }} ({{ $averageResponseTime['minutes'] }}
-            minutes)</p>
-        <p>Average Response Time (Completed Tasks): {{ $averageCompletedResponseTime['formatted'] }}
-            ({{ $averageCompletedResponseTime['minutes'] }} minutes)</p>
+        <h2>Ringkasan</h2>
+        <p>Waktu Respons Rata-rata (Semua): {{ $averageResponseTime['formatted'] }} ({{ $averageResponseTime['minutes'] }} menit)</p>
+        <p>Waktu Respons Rata-rata (Tugas Selesai): {{ $averageCompletedResponseTime['formatted'] }} ({{ $averageCompletedResponseTime['minutes'] }} menit)</p>
     </div>
 
-    <h2>Status Counts</h2>
+    <h2>Status</h2>
     <ul>
         @foreach ($statusCounts as $status => $count)
             <li>{{ $status }}: {{ $count }}</li>
         @endforeach
     </ul>
 
-    <h2>Petugas Counts</h2>
+    <h2>Petugas</h2>
     <ul>
         @foreach ($petugasCounts as $petugas => $count)
             <li>{{ $petugas }}: {{ $count }}</li>
         @endforeach
     </ul>
 
+    <h2>Unit/Poli</h2>
+    <ul>
+        @foreach ($unitCounts as $unit => $count)
+            <li>{{ $unit }}: {{ $count }}</li>
+        @endforeach
+    </ul>
+
     @if (!empty($processedData))
         <button onclick="downloadProcessedData()">Download Processed Data</button>
 
-        <pre><code>
-        {{ print_r($processedData) }}
-        </code></pre>
+        <pre><code>{{ print_r($processedData) }}</code></pre>
     @else
         <p>Data tidak tersedia atau terjadi kesalahan dalam pemrosesan.</p>
     @endif
-
 
     <script>
         function downloadProcessedData() {
