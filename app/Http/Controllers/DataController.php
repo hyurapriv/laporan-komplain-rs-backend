@@ -11,10 +11,19 @@ class DataController extends Controller
 {
     public function index()
     {
+        $processedData = [
+            // Contoh data
+            ['Nama Unit/Poli' => 'Poli Mata'],
+            ['Nama Unit/Poli' => 'Poli Bedah'],
+            ['Nama Unit/Poli' => 'Rekam Medis'],
+            ['Nama Unit/Poli' => 'ICU'],
+            // Tambahkan data lain sesuai kebutuhan
+        ];
+
         $processedData = $this->getProcessedData();
         $statusCounts = $this->getStatusCounts($processedData);
         $petugasCounts = $this->getPetugasCounts($processedData);
-        $unitCounts = $this->getCountsByKey($processedData, 'Nama Unit/Poli');
+        $unitCounts = $this->getUnitCounts($processedData);
         $averageResponseTime = $this->calculateAverageResponseTime($processedData);
         $averageCompletedResponseTime = $this->calculateAverageCompletedResponseTime($processedData);
 
@@ -95,8 +104,8 @@ class DataController extends Controller
 
     private function normalizeUnitNames($unit)
     {
-    // Regex pattern untuk mencocokkan frasa yang mengandung "poli mata"
-    $pattern = '/\b(?:poli\s*mata(?:\s*[\w\s]*)?)\b/i';
+        // Regex pattern untuk mencocokkan frasa yang mengandung "poli mata"
+        $pattern = '/\b(?:poli\s*mata(?:\s*[\w\s]*)?)\b/i';
 
     // Jika unit sesuai dengan pola, kembalikan "Poli Mata"
     if (preg_match($pattern, strtolower($unit))) {
@@ -145,23 +154,73 @@ class DataController extends Controller
 
     private function getUnitCounts($processedData)
     {
-        $units = [
-            'Rekam Medis', 'Kesehatan Lingkungan', 'Poli Bedah', 'Poli Obgyn', 'Perinatologi', 
-            'Farmasi', 'IBS', 'UKM', 'Litbang', 'Laboratorium & Pelayanan Darah', 'Kasir', 
-            'IT', 'Kesling', 'Veritatis Voluptatem', 'RM', 'Jamkes/Pojok JKN', 'Loket TPPRI', 
-            'Angreek', 'UKM Litbang', 'Voluptas Enim Cupida', 'TPPRI', 'IFRS', 'Rehabilitas Medik', 
-            'Poli THT', 'Radiologi', 'Poli Ortho Pedi', 'ICU', 'Poli Mata', 'Klinik Jantung', 
-            'Gizi', 'Poli Gigi', 'Perina', 'Bugenvil'  
+        // Definisikan kata kunci utama untuk setiap unit/poli
+        $keywords = [
+            'Rekam Medis' => ['rekam medis', 'rm'],
+            'Poli Mata' => ['mata'],
+            'Poli Bedah' => ['bedah'],
+            'Poli Obgyn' => ['obgyn'],
+            'Poli THT' => ['tht'],
+            'Poli Orthopedi' => ['orthopedi', 'ortopedi'],
+            'Poli Jantung' => ['jantung'],
+            'Poli Gigi' => ['gigi'],
+            'ICU' => ['icu'],
+            'Radiologi' => ['radiologi'],
+            'Perinatologi' => ['perinatologi', 'perina'],
+            'Rehabilitasi Medik' => ['rehabilitasi medik'],
+            'IGD' => ['igd'],
+            'SIMRS' => ['simrs'],
+            'Kesehatan Lingkungan' => ['kesehatan lingkungan', 'kesling'],
+            'Farmasi' => ['farmasi'],
+            'IBS' => ['ibs'],
+            'UKM' => ['ukm'],
+            'Litbang' => ['litbang'],
+            'Laboratorium & Pelayanan Darah' => ['laboratorium & pelayanan darah', 'laboratorium'],
+            'Kasir' => ['kasir'],
+            'IT' => ['it'],
+            'Jamkes/Pojok JKN' => ['jamkes', 'pojok jkn', 'pojok jkn / loket bpjs', 'jamkes / pojok jkn'],
+            'Loket TPPRI' => ['loket tppri', 'tppri', 'tppri timur'],
+            'Anggrek' => ['anggrek', 'unit anggrek'],
+            'Gizi' => ['gizi'],
+            'Ruang Akreditasi' => ['ruang akreditasi'],
+            'Ranap' => ['ranap'],
+            'TSE' => ['tse'],
+            'Maxime Deserunt Cumq' => ['maxime deserunt cumq'],
+            'Veritatis Voluptatem' => ['veritatis voluptatem'],
+            'Voluptas Enim Cupida' => ['voluptas enim cupida'],
+            'Enim Id Unde Sequi E' => ['enim id unde sequi e'],
+            'Est Iste Quam Dolore' => ['est iste quam dolore'],
+            'Bugenvil' => ['bugenvil'],
+            'Tes' => ['tes'],
         ];
 
-        $unitCounts = array_fill_keys($units, 0);
+        // Inisialisasi unitCounts dengan semua unit yang tersedia
+        $unitCounts = array_fill_keys(array_keys($keywords), 0);
+        $unitCounts['Lainnya'] = 0;
 
+        // Proses setiap data
         foreach ($processedData as $data) {
-            $unit = $data['Nama Unit/Poli'];
-            if (isset($unitCounts[$unit])) {
-                $unitCounts[$unit]++;
+            $unitName = strtolower($data['Nama Unit/Poli']);
+            $matched = false;
+
+            // Cek setiap kata kunci
+            foreach ($keywords as $unit => $words) {
+                foreach ($words as $word) {
+                    if (strpos($unitName, $word) !== false) {
+                        $unitCounts[$unit]++;
+                        $matched = true;
+                        break 2; // Hentikan pencarian setelah menemukan kecocokan
+                    }
+                }
+            }
+
+            // Jika tidak ada kecocokan, masukkan ke kategori 'Lainnya'
+            if (!$matched) {
+                $unitCounts['Lainnya']++;
             }
         }
+
+        return $unitCounts;
     }
 
     private function getCountsByKey($processedData, $key)
