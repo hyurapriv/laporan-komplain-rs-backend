@@ -1,77 +1,152 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
-import Card from './Card';
-import BarChart from './BarChart';
-import { IoSendSharp } from "react-icons/io5";
-import { FaTools, FaCheckCircle } from "react-icons/fa";
-import { MdPendingActions, MdOutlineAccessTimeFilled } from "react-icons/md";
+<!DOCTYPE html>
+<html lang="en">
 
-export default function CardKomplain() {
-  const [dataKomplain, setDataKomplain] = useState({
-    terkirim: 0,
-    proses: 0,
-    selesai: 0,
-    ditunda: 0,
-    responTime: 'N/A',
-    total: 0
-  });
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Processed Data</title>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@10"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
 
-  const fetchKomplainData = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const response = await axios.get('http://localhost:8000/api/komplain-data');
-      setDataKomplain(response.data);
-      setError(null);
-    } catch (error) {
-      console.error('Error fetching komplain data:', error);
-      setError('Gagal memasukkan data komplain');
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+        h1, h2 {
+            color: #333;
+        }
 
-  useEffect(() => {
-    fetchKomplainData();
-    const interval = setInterval(fetchKomplainData, 5 * 60 * 1000); // Refresh every 5 minutes
+        .summary-box {
+            background-color: #e9f7ef;
+            border: 1px solid #28a745;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
 
-    return () => clearInterval(interval);
-  }, [fetchKomplainData]);
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
 
-  const cards = [
-    { name: 'Terkirim', icon: <IoSendSharp size={18} color='#34C031' />, bgColor: 'bg-green', value: dataKomplain.terkirim },
-    { name: 'Proses', icon: <FaTools size={18} color='#34C031' />, bgColor: 'bg-green', value: dataKomplain.proses },
-    { name: 'Selesai', icon: <FaCheckCircle size={18} color='#34C031' />, bgColor: 'bg-green', value: dataKomplain.selesai },
-    { name: 'Ditunda', icon: <MdPendingActions size={18} color='#34C031' />, bgColor: 'bg-green', value: dataKomplain.ditunda },
-    { name: 'Respon Time', icon: <MdOutlineAccessTimeFilled size={18} color='#34C031' />, bgColor: 'bg-green', value: dataKomplain.responTime },
-  ];
+        li {
+            margin: 5px 0;
+        }
 
-  if (isLoading) {
-    return (
-      <div className='flex justify-center items-center h-full'>
-        <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-green-500"></div>
-      </div>
-    );
-  }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
 
-  if (error) {
-    return <div className='text-red-500 text-center'>{error}</div>;
-  }
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
 
-  return (
-    <section className='px-4 flex-1 pt-14'>
-      <div className='flex justify-between'>
-        <h3 className='text-xl font-bold text-slate-800'>Data Komplain Bulan Juli 2024</h3>
-        <h3 className='text-xl font-bold text-slate-800 bg-slate-100 py-2 px-7 shadow-lg'>Juli 2024</h3>
-      </div>
-      <h3 className='ml-1 mt-10 text-lg font-bold text-slate-700'>Total Komplain: {dataKomplain.total}</h3>
-      <div className='grid grid-cols-5 gap-4 mt-5'>
-        {cards.map((card, index) => (
-          <Card key={index} name={card.name} icon={card.icon} bgColor={card.bgColor} value={card.value} />
-        ))}
-      </div>
-      <BarChart data={dataKomplain} />
-    </section>
-  );
-}
+<body>
+    <h1>Processed Data</h1>
+
+    <div class="summary-box">
+        <h2>Ringkasan</h2>
+        <p>Waktu Respons Rata-rata (Semua): {{ $averageResponseTime['formatted'] }} ({{ $averageResponseTime['minutes'] }} menit)</p>
+        <p>Waktu Respons Rata-rata (Tugas Selesai): {{ $averageCompletedResponseTime['formatted'] }} ({{ $averageCompletedResponseTime['minutes'] }} menit)</p>
+    </div>
+
+    <h2>Status</h2>
+    <ul>
+        @foreach ($statusCounts as $status => $count)
+            <li>{{ $status }}: {{ $count }}</li>
+        @endforeach
+    </ul>
+
+    <h2>Petugas</h2>
+    <ul>
+        @foreach ($petugasCounts as $petugas => $count)
+            <li>{{ $petugas }}: {{ $count }}</li>
+        @endforeach
+    </ul>
+
+    <h2>Unit Klinis</h2>
+    @if (!empty($clinicalUnits))
+        <ul>
+            @foreach ($clinicalUnits as $unit => $count)
+                <li>{{ $unit }}: {{ $count }}</li>
+            @endforeach
+        </ul>
+    @else
+        <p>No clinical units found.</p>
+    @endif
+
+    <h2>Unit Non-Klinis</h2>
+    @if (!empty($nonClinicalUnits))
+        <ul>
+            @foreach ($nonClinicalUnits as $unit => $count)
+                <li>{{ $unit }}: {{ $count }}</li>
+            @endforeach
+        </ul>
+    @else
+        <p>No non-clinical units found.</p>
+    @endif
+
+    <h2>Unit Lainnya</h2>
+    @if (!empty($otherUnits))
+        <ul>
+            @foreach ($otherUnits as $unit => $count)
+                <li>{{ $unit }}: {{ $count }}</li>
+            @endforeach
+        </ul>
+    @else
+        <p>No other units found.</p>
+    @endif
+
+    @if (!empty($processedData))
+        <button onclick="downloadProcessedData()">Download Processed Data</button>
+
+        <pre><code>{{ print_r($processedData, true) }}</code></pre>
+    @else
+        <p>Data tidak tersedia atau terjadi kesalahan dalam pemrosesan.</p>
+    @endif
+
+    <script>
+        function downloadProcessedData() {
+            fetch('{{ route('data.download') }}')
+                .then(response => response.blob())
+                .then(blob => {
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'processed_data.json';
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Data berhasil diunduh',
+                        text: 'File processed_data.json berhasil diunduh!',
+                        timer: 3000,
+                        timerProgressBar: true,
+                        showConfirmButton: false
+                    });
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Oops...',
+                        text: 'Terjadi kesalahan saat mengunduh data!',
+                    });
+                });
+        }
+    </script>
+</body>
+
+</html>
