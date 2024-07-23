@@ -181,89 +181,90 @@ class DataController extends Controller
     }
 
     private function getUnitCounts($processedData)
-    {
-        $keywords = [
-            'Klinis' => [
-                'Rekam Medis' => ['rekam medis', 'rm'],
-                'Poli Mata' => ['mata'],
-                'Poli Bedah' => ['bedah'],
-                'Poli Obgyn' => ['obgyn'],
-                'Poli THT' => ['tht'],
-                'Poli Orthopedi' => ['orthopedi', 'ortopedi'],
-                'Poli Jantung' => ['jantung'],
-                'Poli Gigi' => ['gigi'],
-                'ICU' => ['icu'],
-                'Radiologi' => ['radiologi'],
-                'Perinatologi' => ['perinatologi', 'perina'],
-                'Rehabilitasi Medik' => ['rehabilitasi medik'],
-                'IGD' => ['igd'],
-            ],
-            'Non-Klinis' => [
-                'Kesehatan Lingkungan' => ['kesehatan lingkungan', 'kesling'],
-                'Farmasi' => ['farmasi'],
-                'IBS' => ['ibs'],
-                'UKM' => ['ukm'],
-                'Litbang' => ['litbang'],
-                'Laboratorium & Pelayanan Darah' => ['laboratorium & pelayanan darah', 'laboratorium'],
-                'Kasir' => ['kasir'],
-                'IT' => ['it'],
-                'Jamkes/Pojok JKN' => ['jamkes', 'pojok jkn', 'pojok jkn / loket bpjs', 'jamkes / pojok jkn'],
-                'Loket TPPRI' => ['loket tppri', 'tppri', 'tppri timur'],
-                'Anggrek' => ['anggrek', 'unit anggrek'],
-                'Gizi' => ['gizi'],
-                'Ruang Akreditasi' => ['ruang akreditasi', 'akreditasi'],
-                'Ranap' => ['ranap'],
-                'Bugenvil' => ['bugenvil'],
-            ],
-            'Lainnya' => [
-                'TSE' => ['tse'],
-                'Maxime Deserunt Cumq' => ['maxime deserunt cumq'],
-                'Veritatis Voluptatem' => ['veritatis voluptatem'],
-                'Voluptas Enim Cupida' => ['voluptas enim cupida'],
-                'Enim Id Unde Sequi E' => ['enim id unde sequi e'],
-                'Est Iste Quam Dolore' => ['est iste quam dolore'],
-                'Tes' => ['tes'],
-            ],
-        ];
-    
-        $unitCounts = [
-            'Klinis' => array_fill_keys(array_keys($keywords['Klinis']), 0),
-            'Non-Klinis' => array_fill_keys(array_keys($keywords['Non-Klinis']), 0),
-            'Lainnya' => array_fill_keys(array_keys($keywords['Lainnya']), 0),
-        ];
-    
-        foreach ($processedData as $data) {
-            $unitName = strtolower($data['Nama Unit/Poli']);
-            $matched = false;
-    
-            Log::info('Processing unit:', ['unit' => $unitName]);
-    
-            foreach ($keywords as $category => $units) {
-                foreach ($units as $unit => $words) {
-                    foreach ($words as $word) {
-                        if (stripos($unitName, $word) !== false) {
-                            $unitCounts[$category][$unit]++;
-                            $matched = true;
-                            Log::info("Matched {$category} unit:", ['unit' => $unit, 'word' => $word]);
-                            break 3;
-                        }
+{
+    $keywords = [
+        'Klinis' => [
+            'Rekam Medis' => ['rekam medis', 'rm'],
+            'Poli Mata' => ['mata'],
+            'Poli Bedah' => ['bedah'],
+            'Poli Obgyn' => ['obgyn'],
+            'Poli THT' => ['tht'],
+            'Poli Orthopedi' => ['orthopedi', 'ortopedi'],
+            'Poli Jantung' => ['jantung'],
+            'Poli Gigi' => ['gigi'],
+            'ICU' => ['icu'],
+            'Radiologi' => ['radiologi'],
+            'Perinatologi' => ['perinatologi', 'perina'],
+            'Rehabilitasi Medik' => ['rehabilitasi medik'],
+            'IGD' => ['igd'],
+        ],
+        'Non-Klinis' => [
+            'Kesehatan Lingkungan' => ['kesehatan lingkungan', 'kesling'],
+            'IBS' => ['ibs'],
+            'UKM' => ['ukm'],
+            'Litbang' => ['litbang'],
+            'Ruang Akreditasi' => ['ruang akreditasi', 'akreditasi'],
+            'Laboratorium & Pelayanan Darah' => ['laboratorium & pelayanan darah', 'laboratorium'],
+            'Kasir' => ['kasir'],
+            'IT' => ['it'],
+            'Jamkes/Pojok JKN' => ['jamkes', 'pojok jkn', 'pojok jkn / loket bpjs', 'jamkes / pojok jkn'],
+            'Loket TPPRI' => ['loket tppri', 'tppri', 'tppri timur'],
+            'Anggrek' => ['anggrek', 'unit anggrek'],
+            'Gizi' => ['gizi'],
+            'Ranap' => ['ranap'],
+            'Bugenvil' => ['bugenvil'],
+            'Farmasi' => ['farmasi'], // Ensure the keyword here is lowercase
+        ],
+        'Lainnya' => [
+            'TSE' => ['tse'],
+            'Maxime Deserunt Cumq' => ['maxime deserunt cumq'],
+            'Veritatis Voluptatem' => ['veritatis voluptatem'],
+            'Voluptas Enim Cupida' => ['voluptas enim cupida'],
+            'Enim Id Unde Sequi E' => ['enim id unde sequi e'],
+            'Est Iste Quam Dolore' => ['est iste quam dolore'],
+            'Tes' => ['tes'],
+        ],
+    ];
+
+    $unitCounts = [
+        'Klinis' => array_fill_keys(array_keys($keywords['Klinis']), 0),
+        'Non-Klinis' => array_fill_keys(array_keys($keywords['Non-Klinis']), 0),
+        'Lainnya' => array_fill_keys(array_keys($keywords['Lainnya']), 0),
+    ];
+
+    foreach ($processedData as $data) {
+        $unitName = strtolower($data['Nama Unit/Poli']);
+        $matched = false;
+
+        Log::info('Processing unit:', ['unit' => $unitName]);
+
+        foreach ($keywords as $category => $units) {
+            foreach ($units as $unit => $words) {
+                foreach ($words as $word) {
+                    if (stripos($unitName, $word) !== false) {
+                        $unitCounts[$category][$unit]++;
+                        $matched = true;
+                        Log::info("Matched {$category} unit:", ['unit' => $unit, 'word' => $word]);
+                        break 3;
                     }
                 }
             }
-    
-            if (!$matched) {
-                if (!isset($unitCounts['Lainnya']['Lainnya'])) {
-                    $unitCounts['Lainnya']['Lainnya'] = 0;
-                }
-                $unitCounts['Lainnya']['Lainnya']++;
-                Log::info('Unmatched unit:', ['unit' => $unitName]);
-            }
         }
-    
-        Log::info('Final unit counts:', ['unitCounts' => $unitCounts]);
-    
-        return $unitCounts;
+
+        if (!$matched) {
+            if (!isset($unitCounts['Lainnya']['Lainnya'])) {
+                $unitCounts['Lainnya']['Lainnya'] = 0;
+            }
+            $unitCounts['Lainnya']['Lainnya']++;
+            Log::info('Unmatched unit:', ['unit' => $unitName]);
+        }
     }
+
+    Log::info('Final unit counts:', ['unitCounts' => $unitCounts]);
+
+    return $unitCounts;
+}
+
     
     
 
