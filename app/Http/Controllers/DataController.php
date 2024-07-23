@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Data;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class DataController extends Controller
@@ -180,111 +181,128 @@ class DataController extends Controller
     }
 
     private function getUnitCounts($processedData)
-    {
-        // Definisikan kata kunci utama untuk setiap unit/poli berdasarkan kelompok
-        $keywords = [
-            // Kelompok Unit Klinis
-            'Klinis' => [
-                'Rekam Medis' => ['rekam medis', 'rm'],
-                'Poli Mata' => ['mata'],
-                'Poli Bedah' => ['bedah'],
-                'Poli Obgyn' => ['obgyn'],
-                'Poli THT' => ['tht'],
-                'Poli Orthopedi' => ['orthopedi', 'ortopedi'],
-                'Poli Jantung' => ['jantung'],
-                'Poli Gigi' => ['gigi'],
-                'ICU' => ['icu'],
-                'Radiologi' => ['radiologi'],
-                'Perinatologi' => ['perinatologi', 'perina'],
-                'Rehabilitasi Medik' => ['rehabilitasi medik'],
-                'IGD' => ['igd'],
-            ],
-            // Kelompok Unit Non-Klinis
-            'Non-Klinis' => [
-                'Kesehatan Lingkungan' => ['kesehatan lingkungan', 'kesling'],
-                'Farmasi' => ['farmasi'],
-                'IBS' => ['ibs'],
-                'UKM' => ['ukm'],
-                'Litbang' => ['litbang'],
-                'Laboratorium & Pelayanan Darah' => ['laboratorium & pelayanan darah', 'laboratorium'],
-                'Kasir' => ['kasir'],
-                'IT' => ['it'],
-                'Jamkes/Pojok JKN' => ['jamkes', 'pojok jkn', 'pojok jkn / loket bpjs', 'jamkes / pojok jkn'],
-                'Loket TPPRI' => ['loket tppri', 'tppri', 'tppri timur'],
-                'Anggrek' => ['anggrek', 'unit anggrek'],
-                'Gizi' => ['gizi'],
-                'Ruang Akreditasi' => ['ruang akreditasi'],
-                'Ranap' => ['ranap'],
-                'Bugenvil' => ['bugenvil'],
-            ],
-            'Lainnya' => [
-                'TSE' => ['tse'],
-                'Maxime Deserunt Cumq' => ['maxime deserunt cumq'],
-                'Veritatis Voluptatem' => ['veritatis voluptatem'],
-                'Voluptas Enim Cupida' => ['voluptas enim cupida'],
-                'Enim Id Unde Sequi E' => ['enim id unde sequi e'],
-                'Est Iste Quam Dolore' => ['est iste quam dolore'],
-                'Tes' => ['tes'],
-            ],
-        ];
+{
+    // Definisikan kata kunci utama untuk setiap unit/poli berdasarkan kelompok
+    $keywords = [
+        // Kelompok Unit Klinis
+        'Klinis' => [
+            'Rekam Medis' => ['rekam medis', 'rm'],
+            'Poli Mata' => ['mata'],
+            'Poli Bedah' => ['bedah'],
+            'Poli Obgyn' => ['obgyn'],
+            'Poli THT' => ['tht'],
+            'Poli Orthopedi' => ['orthopedi', 'ortopedi'],
+            'Poli Jantung' => ['jantung'],
+            'Poli Gigi' => ['gigi'],
+            'ICU' => ['icu'],
+            'Radiologi' => ['radiologi'],
+            'Perinatologi' => ['perinatologi', 'perina'],
+            'Rehabilitasi Medik' => ['rehabilitasi medik'],
+            'IGD' => ['igd'],
+        ],
+        // Kelompok Unit Non-Klinis
+        'Non-Klinis' => [
+            'Kesehatan Lingkungan' => ['kesehatan lingkungan', 'kesling'],
+            'Farmasi' => ['farmasi'],
+            'IBS' => ['ibs'],
+            'UKM' => ['ukm'],
+            'Litbang' => ['litbang'],
+            'Laboratorium & Pelayanan Darah' => ['laboratorium & pelayanan darah', 'laboratorium'],
+            'Kasir' => ['kasir'],
+            'IT' => ['it'],
+            'Jamkes/Pojok JKN' => ['jamkes', 'pojok jkn', 'pojok jkn / loket bpjs', 'jamkes / pojok jkn'],
+            'Loket TPPRI' => ['loket tppri', 'tppri', 'tppri timur'],
+            'Anggrek' => ['anggrek', 'unit anggrek'],
+            'Gizi' => ['gizi'],
+            'Ruang Akreditasi' => ['ruang akreditasi'],
+            'Ranap' => ['ranap'],
+            'Bugenvil' => ['bugenvil'],
+        ],
+        'Lainnya' => [
+            'TSE' => ['tse'],
+            'Maxime Deserunt Cumq' => ['maxime deserunt cumq'],
+            'Veritatis Voluptatem' => ['veritatis voluptatem'],
+            'Voluptas Enim Cupida' => ['voluptas enim cupida'],
+            'Enim Id Unde Sequi E' => ['enim id unde sequi e'],
+            'Est Iste Quam Dolore' => ['est iste quam dolore'],
+            'Tes' => ['tes'],
+        ],
+    ];
 
-        // Inisialisasi unitCounts dengan semua kelompok dan unit
-        $unitCounts = [
-            'Klinis' => array_fill_keys(array_keys($keywords['Klinis']), 0),
-            'Non-Klinis' => array_fill_keys(array_keys($keywords['Non-Klinis']), 0),
-            'Lainnya' => array_fill_keys(array_keys($keywords['Lainnya']), 0),
-        ];
+    // Inisialisasi unitCounts dengan semua kelompok dan unit
+    $unitCounts = [
+        'Klinis' => array_fill_keys(array_keys($keywords['Klinis']), 0),
+        'Non-Klinis' => array_fill_keys(array_keys($keywords['Non-Klinis']), 0),
+        'Lainnya' => array_fill_keys(array_keys($keywords['Lainnya']), 0),
+    ];
 
-        // Proses setiap data
-        foreach ($processedData as $data) {
-            $unitName = strtolower($data['Nama Unit/Poli']);
-            $matched = false;
+    // Proses setiap data
+    foreach ($processedData as $data) {
+        $unitName = strtolower($data['Nama Unit/Poli']);
+        $matched = false;
 
-            // Cek setiap kata kunci di kelompok Klinis
-            foreach ($keywords['Klinis'] as $unit => $words) {
+        // Debugging: Log unit name being processed
+        Log::info('Processing unit:', ['unit' => $unitName]);
+
+        // Cek setiap kata kunci di kelompok Klinis
+        foreach ($keywords['Klinis'] as $unit => $words) {
+            foreach ($words as $word) {
+                if (strpos($unitName, $word) !== false) {
+                    $unitCounts['Klinis'][$unit]++;
+                    $matched = true;
+                    break 2; // Hentikan pencarian setelah menemukan kecocokan
+                }
+            }
+        }
+
+        // Cek setiap kata kunci di kelompok Non-Klinis jika belum cocok
+        if (!$matched) {
+            foreach ($keywords['Non-Klinis'] as $unit => $words) {
                 foreach ($words as $word) {
                     if (strpos($unitName, $word) !== false) {
-                        $unitCounts['Klinis'][$unit]++;
+                        $unitCounts['Non-Klinis'][$unit]++;
                         $matched = true;
+                        // Debugging: Log matching unit
+                        Log::info('Matched Non-Klinis unit:', ['unit' => $unit, 'word' => $word]);
                         break 2; // Hentikan pencarian setelah menemukan kecocokan
                     }
                 }
             }
+        }
 
-            // Cek setiap kata kunci di kelompok Non-Klinis jika belum cocok
-            if (!$matched) {
-                foreach ($keywords['Non-Klinis'] as $unit => $words) {
-                    foreach ($words as $word) {
-                        if (strpos($unitName, $word) !== false) {
-                            $unitCounts['Non-Klinis'][$unit]++;
-                            $matched = true;
-                            break 2; // Hentikan pencarian setelah menemukan kecocokan
-                        }
+        if (!$matched) {
+            foreach ($keywords['Lainnya'] as $unit => $words) {
+                foreach ($words as $word) {
+                    if (strpos($unitName, $word) !== false) {
+                        $unitCounts['Lainnya'][$unit]++;
+                        $matched = true;
+                        // Debugging: Log matching unit
+                        Log::info('Matched Lainnya unit:', ['unit' => $unit, 'word' => $word]);
+                        break 2; // Hentikan pencarian setelah menemukan kecocokan
                     }
                 }
-            }
-
-            if (!$matched) {
-                foreach ($keywords['Lainnya'] as $unit => $words) {
-                    foreach ($words as $word) {
-                        if (strpos($unitName, $word) !== false) {
-                            $unitCounts['Lainnya'][$unit]++;
-                            $matched = true;
-                            break 2; // Hentikan pencarian setelah menemukan kecocokan
-                        }
-                    }
-                }
-            }
-
-
-            // Jika tidak ada kecocokan, masukkan ke kategori 'Lainnya'
-            if (!$matched) {
-                $unitCounts['Lainnya']['Lainnya']++;
             }
         }
 
-        return $unitCounts;
+        // Jika tidak ada kecocokan, masukkan ke kategori 'Lainnya'
+        if (!$matched) {
+            if (!isset($unitCounts['Lainnya']['Lainnya'])) {
+                $unitCounts['Lainnya']['Lainnya'] = 0;
+            }
+            $unitCounts['Lainnya']['Lainnya']++;
+            // Debugging: Log unmatched unit
+            Log::info('Unmatched unit:', ['unit' => $unitName]);
+        }
     }
+
+    // Debugging: Log the final unit counts
+    Log::info('Final unit counts:', ['unitCounts' => $unitCounts]);
+
+    return $unitCounts;
+}
+
+
+    
 
     private function getCountsByKey($processedData, $key)
     {

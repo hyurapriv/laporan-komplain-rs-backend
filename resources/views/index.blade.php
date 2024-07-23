@@ -82,10 +82,10 @@
             @endforeach
         </ul>
     @else
-        <p>No clinical units found.</p>
+        <p>Tidak ada unit klinis yang ditemukan.</p>
     @endif
 
-    <h1>Unit Non-Klinis</h1>
+    <h2>Unit Non-Klinis</h2>
     @if (!empty($nonClinicalUnits))
         <ul>
             @foreach ($nonClinicalUnits as $unit => $count)
@@ -93,15 +93,20 @@
             @endforeach
         </ul>
     @else
-        <p>No non-clinical units found.</p>
+        <p>Tidak ada unit non-klinis yang ditemukan.</p>
     @endif
 
-    <h1>Unit Lainnya</h1>
+    <h2>Unit Lainnya</h2>
     @if (!empty($otherUnits))
-        <p>{{ $otherUnits }}</p>
+        <ul>
+            @foreach ($otherUnits as $unit => $count)
+                <li>{{ $unit }}: {{ $count }}</li>
+            @endforeach
+        </ul>
     @else
-        <p>No other units found.</p>
+        <p>Tidak ada unit lain yang ditemukan.</p>
     @endif
+
     @if (!empty($processedData))
         <button onclick="downloadProcessedData()">Download Processed Data</button>
 
