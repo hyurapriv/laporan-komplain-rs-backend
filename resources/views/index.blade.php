@@ -145,8 +145,4 @@
                         text: 'Terjadi kesalahan saat mengunduh data!',
                     });
                 });
-        }
-    </script>
-</body>
-
-</html>
+       
