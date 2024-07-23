@@ -11,15 +11,6 @@ class DataController extends Controller
 {
     public function index()
     {
-        $processedData = [
-            // Contoh data
-            ['Nama Unit/Poli' => 'Poli Mata'],
-            ['Nama Unit/Poli' => 'Poli Bedah'],
-            ['Nama Unit/Poli' => 'Rekam Medis'],
-            ['Nama Unit/Poli' => 'ICU'],
-            // Tambahkan data lain sesuai kebutuhan
-        ];
-
         $processedData = $this->getProcessedData();
         $statusCounts = $this->getStatusCounts($processedData);
         $petugasCounts = $this->getPetugasCounts($processedData);
@@ -27,20 +18,10 @@ class DataController extends Controller
         $averageResponseTime = $this->calculateAverageResponseTime($processedData);
         $averageCompletedResponseTime = $this->calculateAverageCompletedResponseTime($processedData);
 
-        $clinicalUnits = array_filter($unitCounts['Klinis'], function ($count) {
-            return $count > 0;
-        });
-
-        $nonClinicalUnits = array_filter($unitCounts['Non-Klinis'], function ($count) {
-            return $count > 0;
-        });
-
-        $otherUnits = $unitCounts['Lainnya'] ?? 0;
-
-        // Use dd() to debug and check if the variables have the expected data
-
-
-
+        // Memisahkan unit berdasarkan kategori
+        $clinicalUnits = $unitCounts['Klinis'];
+        $nonClinicalUnits = $unitCounts['Non-Klinis'];
+        $otherUnits = $unitCounts['Lainnya'];
 
         return view('index', compact(
             'processedData',
@@ -49,7 +30,6 @@ class DataController extends Controller
             'clinicalUnits',
             'nonClinicalUnits',
             'otherUnits',
-            'unitCounts',
             'averageResponseTime',
             'averageCompletedResponseTime'
         ));
@@ -205,7 +185,7 @@ class DataController extends Controller
                 'Farmasi' => ['farmasi'],
                 'IBS' => ['ibs'],
                 'UKM' => ['ukm'],
-                'Litbang' => ['litbang'],
+                'Litbang' => ['litbang', 'ukm'],
                 'Laboratorium & Pelayanan Darah' => ['laboratorium & pelayanan darah', 'laboratorium'],
                 'Kasir' => ['kasir'],
                 'IT' => ['it'],
@@ -217,32 +197,19 @@ class DataController extends Controller
                 'Ranap' => ['ranap'],
                 'Bugenvil' => ['bugenvil'],
             ],
-            'Lainnya' => [
-                'TSE' => ['tse'],
-                'Maxime Deserunt Cumq' => ['maxime deserunt cumq'],
-                'Veritatis Voluptatem' => ['veritatis voluptatem'],
-                'Voluptas Enim Cupida' => ['voluptas enim cupida'],
-                'Enim Id Unde Sequi E' => ['enim id unde sequi e'],
-                'Est Iste Quam Dolore' => ['est iste quam dolore'],
-<<<<<<< HEAD
-=======
-                'Tes' => ['tes'],
->>>>>>> d72edc25c517ddd34c0a490604c89498e23009b4
-            ],
+            'Lainnya' => []
         ];
-
-        // Inisialisasi unitCounts dengan semua kelompok dan unit
+    
         $unitCounts = [
             'Klinis' => array_fill_keys(array_keys($keywords['Klinis']), 0),
             'Non-Klinis' => array_fill_keys(array_keys($keywords['Non-Klinis']), 0),
-            'Lainnya' => array_fill_keys(array_keys($keywords['Lainnya']), 0),
+            'Lainnya' => []
         ];
-
-        // Proses setiap data
+    
         foreach ($processedData as $data) {
             $unitName = strtolower($data['Nama Unit/Poli']);
             $matched = false;
-
+    
             // Cek setiap kata kunci di kelompok Klinis
             foreach ($keywords['Klinis'] as $unit => $words) {
                 foreach ($words as $word) {
@@ -253,7 +220,7 @@ class DataController extends Controller
                     }
                 }
             }
-
+    
             // Cek setiap kata kunci di kelompok Non-Klinis jika belum cocok
             if (!$matched) {
                 foreach ($keywords['Non-Klinis'] as $unit => $words) {
@@ -266,40 +233,14 @@ class DataController extends Controller
                     }
                 }
             }
-
-            if (!$matched) {
-                foreach ($keywords['Lainnya'] as $unit => $words) {
-                    foreach ($words as $word) {
-                        if (strpos($unitName, $word) !== false) {
-                            $unitCounts['Lainnya'][$unit]++;
-                            $matched = true;
-                            break 2; // Hentikan pencarian setelah menemukan kecocokan
-                        }
-                    }
-                }
-            }
-
-
+    
             // Jika tidak ada kecocokan, masukkan ke kategori 'Lainnya'
             if (!$matched) {
-                $unitCounts['Lainnya']['Lainnya']++;
+                $unitCounts['Lainnya'][$unitName] = ($unitCounts['Lainnya'][$unitName] ?? 0) + 1;
             }
         }
-
+    
         return $unitCounts;
-    }
-
-    private function getCountsByKey($processedData, $key)
-    {
-        $counts = [];
-        foreach ($processedData as $data) {
-            $value = $data[$key] ?? '';
-            if (!empty($value)) {
-                $normalizedValue = strtolower($value);
-                $counts[$normalizedValue] = ($counts[$normalizedValue] ?? 0) + 1;
-            }
-        }
-        return $counts;
     }
 
     private function formatDateTime($dateTime)
