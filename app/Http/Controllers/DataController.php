@@ -224,10 +224,7 @@ class DataController extends Controller
                 'Voluptas Enim Cupida' => ['voluptas enim cupida'],
                 'Enim Id Unde Sequi E' => ['enim id unde sequi e'],
                 'Est Iste Quam Dolore' => ['est iste quam dolore'],
-<<<<<<< HEAD
-=======
                 'Tes' => ['tes'],
->>>>>>> d72edc25c517ddd34c0a490604c89498e23009b4
             ],
         ];
 
