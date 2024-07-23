@@ -279,7 +279,7 @@ class DataController extends Controller
 
             // Jika tidak ada kecocokan, masukkan ke kategori 'Lainnya'
             if (!$matched) {
-                $unitCounts['Lainnya']['']++;
+                $unitCounts['Lainnya']['Lainnya']++;
             }
         }
 
