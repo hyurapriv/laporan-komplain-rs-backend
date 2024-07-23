@@ -293,6 +293,7 @@ class DataController extends Controller
     
         return $unitCounts;
     }
+    
     private function getCountsByKey($processedData, $key)
     {
         $counts = [];
