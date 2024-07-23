@@ -181,96 +181,119 @@ class DataController extends Controller
     }
 
     private function getUnitCounts($processedData)
-{
-    $keywords = [
-        'Klinis' => [
-            'Rekam Medis' => ['rekam medis', 'rm'],
-            'Poli Mata' => ['mata'],
-            'Poli Bedah' => ['bedah'],
-            'Poli Obgyn' => ['obgyn'],
-            'Poli THT' => ['tht'],
-            'Poli Orthopedi' => ['orthopedi', 'ortopedi'],
-            'Poli Jantung' => ['jantung'],
-            'Poli Gigi' => ['gigi'],
-            'ICU' => ['icu'],
-            'Radiologi' => ['radiologi'],
-            'Perinatologi' => ['perinatologi', 'perina'],
-            'Rehabilitasi Medik' => ['rehabilitasi medik'],
-            'IGD' => ['igd'],
-        ],
-        'Non-Klinis' => [
-            'Kesehatan Lingkungan' => ['kesehatan lingkungan', 'kesling'],
-            'IBS' => ['ibs'],
-            'UKM' => ['ukm'],
-            'Litbang' => ['litbang'],
-            'Ruang Akreditasi' => ['ruang akreditasi', 'akreditasi'],
-            'Laboratorium & Pelayanan Darah' => ['laboratorium & pelayanan darah', 'laboratorium'],
-            'Kasir' => ['kasir'],
-            'IT' => ['it'],
-            'Jamkes/Pojok JKN' => ['jamkes', 'pojok jkn', 'pojok jkn / loket bpjs', 'jamkes / pojok jkn'],
-            'Loket TPPRI' => ['loket tppri', 'tppri', 'tppri timur'],
-            'Anggrek' => ['anggrek', 'unit anggrek'],
-            'Gizi' => ['gizi'],
-            'Ranap' => ['ranap'],
-            'Bugenvil' => ['bugenvil'],
-            'Farmasi' => ['farmasi'], // Ensure the keyword here is lowercase
-        ],
-        'Lainnya' => [
-            'TSE' => ['tse'],
-            'Maxime Deserunt Cumq' => ['maxime deserunt cumq'],
-            'Veritatis Voluptatem' => ['veritatis voluptatem'],
-            'Voluptas Enim Cupida' => ['voluptas enim cupida'],
-            'Enim Id Unde Sequi E' => ['enim id unde sequi e'],
-            'Est Iste Quam Dolore' => ['est iste quam dolore'],
-            'Tes' => ['tes'],
-        ],
-    ];
+    {
+        Log::info('Starting getUnitCounts function');
+        Log::info('Checking for Farmasi in input data');
+        foreach ($processedData as $data) {
+            if (stripos($data['Nama Unit/Poli'], 'farmasi') !== false) {
+                Log::info('Found Farmasi:', ['unit' => $data['Nama Unit/Poli']]);
+            }
+            if (stripos($data['Nama Unit/Poli'], 'it') !== false) {
+                Log::info('Found IT:', ['unit' => $data['Nama Unit/Poli']]);
+            }
+        }
+    
+        $keywords = [
+            'Klinis' => [
+                'Rekam Medis' => ['rekam medis', 'rm'],
+                'Poli Mata' => ['mata'],
+                'Poli Bedah' => ['bedah'],
+                'Poli Obgyn' => ['obgyn'],
+                'Poli THT' => ['tht'],
+                'Poli Orthopedi' => ['orthopedi', 'ortopedi'],
+                'Poli Jantung' => ['jantung'],
+                'Poli Gigi' => ['gigi'],
+                'ICU' => ['icu'],
+                'Radiologi' => ['radiologi'],
+                'Perinatologi' => ['perinatologi', 'perina'],
+                'Rehabilitasi Medik' => ['rehabilitasi medik'],
+                'IGD' => ['igd'],
+            ],
+            'Non-Klinis' => [
+                'Kesehatan Lingkungan' => ['kesehatan lingkungan', 'kesling'],
+                'IBS' => ['ibs'],
+                'Farmasi' => ['farmasi'],
+                'Litbang' => ['litbang', 'ukm '],
+                'ukm' => ['ukm'],
+                'Ruang Akreditasi' => ['ruang akreditasi', 'akreditasi'],
+                'Laboratorium & Pelayanan Darah' => ['laboratorium & pelayanan darah', 'laboratorium'],
+                'Kasir' => ['kasir'],
+                'IT' => ['it', 'I.T', 'I.T.'],
+                'Jamkes/Pojok JKN' => ['jamkes', 'pojok jkn', 'pojok jkn / loket bpjs', 'jamkes / pojok jkn'],
+                'Loket TPPRI' => ['loket tppri', 'tppri', 'tppri timur'],
+                'Anggrek' => ['anggrek', 'unit anggrek'],
+                'Gizi' => ['gizi'],
+                'Ranap' => ['ranap'],
+                'Bugenvil' => ['bugenvil'],
+                 // Moved Farmasi to Non-Klinis
+            ],
+            'Lainnya' => [
+                'TSE' => ['tse'],
+                'Maxime Deserunt Cumq' => ['maxime deserunt cumq'],
+                'Veritatis Voluptatem' => ['veritatis voluptatem'],
+                'Voluptas Enim Cupida' => ['voluptas enim cupida'],
+                'Enim Id Unde Sequi E' => ['enim id unde sequi e'],
+                'Est Iste Quam Dolore' => ['est iste quam dolore'],
+                'Tes' => ['tes'],
+            ],
+        ];
+    
+        $unitCounts = [
+            'Klinis' => array_fill_keys(array_keys($keywords['Klinis']), 0),
+            'Non-Klinis' => array_fill_keys(array_keys($keywords['Non-Klinis']), 0),
+            'Lainnya' => array_fill_keys(array_keys($keywords['Lainnya']), 0),
+        ];
+    
+        foreach ($processedData as $data) {
+            $unitName = strtolower($data['Nama Unit/Poli']);
+            $matched = false;
+    
+            Log::info('Processing unit:', ['unit' => $unitName]);
+    
+            // Pengecekan khusus untuk Farmasi
+            if (stripos($unitName, 'farmasi') !== false) {
+                $unitCounts['Non-Klinis']['Farmasi']++;
+                $matched = true;
+                Log::info('Matched Farmasi:', ['unit' => $unitName]);
+                continue;  // Lanjut ke data berikutnya
+            }
+            if (stripos($unitName, 'it') !== false || stripos($unitName, 'i.t') !== false) {
+                $unitCounts['Non-Klinis']['IT']++;
+                $matched = true;
+                Log::info('Matched IT:', ['unit' => $unitName, 'count' => $unitCounts]);
+                continue;  // Lanjut ke data berikutnya
+            }
 
-    $unitCounts = [
-        'Klinis' => array_fill_keys(array_keys($keywords['Klinis']), 0),
-        'Non-Klinis' => array_fill_keys(array_keys($keywords['Non-Klinis']), 0),
-        'Lainnya' => array_fill_keys(array_keys($keywords['Lainnya']), 0),
-    ];
-
-    foreach ($processedData as $data) {
-        $unitName = strtolower($data['Nama Unit/Poli']);
-        $matched = false;
-
-        Log::info('Processing unit:', ['unit' => $unitName]);
-
-        foreach ($keywords as $category => $units) {
-            foreach ($units as $unit => $words) {
-                foreach ($words as $word) {
-                    if (stripos($unitName, $word) !== false) {
-                        $unitCounts[$category][$unit]++;
-                        $matched = true;
-                        Log::info("Matched {$category} unit:", ['unit' => $unit, 'word' => $word]);
-                        break 3;
+    
+            foreach ($keywords as $category => $units) {
+                foreach ($units as $unit => $words) {
+                    foreach ($words as $word) {
+                        if (stripos($unitName, $word) !== false) {
+                            $unitCounts[$category][$unit]++;
+                            $matched = true;
+                            Log::info("Matched {$category} unit:", ['unit' => $unit, 'word' => $word]);
+                            break 3;
+                        }
                     }
                 }
             }
-        }
-
-        if (!$matched) {
-            if (!isset($unitCounts['Lainnya']['Lainnya'])) {
-                $unitCounts['Lainnya']['Lainnya'] = 0;
+    
+            if (!$matched) {
+                if (!isset($unitCounts['Lainnya']['Lainnya'])) {
+                    $unitCounts['Lainnya']['Lainnya'] = 0;
+                }
+                $unitCounts['Lainnya']['Lainnya']++;
+                Log::info('Unmatched unit:', ['unit' => $unitName]);
             }
-            $unitCounts['Lainnya']['Lainnya']++;
-            Log::info('Unmatched unit:', ['unit' => $unitName]);
         }
+    
+        Log::info('Final unit counts:', ['unitCounts' => $unitCounts]);
+        Log::info('Farmasi count:', ['count' => $unitCounts['Non-Klinis']['Farmasi'] ?? 0]);
+        Log::info('Manual IT count:', ['count' => $unitCounts]);
+
+    
+        return $unitCounts;
     }
-
-    Log::info('Final unit counts:', ['unitCounts' => $unitCounts]);
-
-    return $unitCounts;
-}
-
-    
-    
-
-
-    
-
     private function getCountsByKey($processedData, $key)
     {
         $counts = [];
