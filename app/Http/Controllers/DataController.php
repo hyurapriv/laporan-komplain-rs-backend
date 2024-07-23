@@ -225,7 +225,6 @@ class DataController extends Controller
                 'Gizi' => ['gizi'],
                 'Ranap' => ['ranap'],
                 'Bugenvil' => ['bugenvil'],
-                 // Moved Farmasi to Non-Klinis
             ],
             'Lainnya' => [
                 'TSE' => ['tse'],
