@@ -52,7 +52,7 @@
 </head>
 
 <body>
-    <h1>Data Yang Diproses</h1>
+    <h1>Data Yang Di</h1>
 
     <div class="summary-box">
         <h2>Ringkasan</h2>
