@@ -14,7 +14,7 @@
             background-color: #f5f5f5;
         }
 
-        h1, h2 {
+        h1, h2, h3 {
             color: #333;
         }
 
@@ -48,6 +48,33 @@
         button:hover {
             background-color: #0056b3;
         }
+
+        .unit-category {
+            margin-bottom: 30px;
+        }
+
+        .unit-details {
+            margin-left: 20px;
+        }
+
+        .status-details {
+            margin-left: 40px;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                margin: 10px;
+            }
+
+            .summary-box, button {
+                width: 100%;
+                box-sizing: border-box;
+            }
+
+            .unit-details, .status-details {
+                margin-left: 10px;
+            }
+        }
     </style>
 </head>
 
@@ -56,8 +83,8 @@
 
     <div class="summary-box">
         <h2>Ringkasan</h2>
-        <p>Waktu Respons Rata-rata (Semua): {{ $averageResponseTime['formatted'] }} ({{ $averageResponseTime['minutes'] }} menit)</p>
-        <p>Waktu Respons Rata-rata (Tugas Selesai): {{ $averageCompletedResponseTime['formatted'] }} ({{ $averageCompletedResponseTime['minutes'] }} menit)</p>
+        <p>Waktu Respons Rata-rata (Semua): <span id="average-response-time">{{ $averageResponseTime['formatted'] }}</span> (<span>{{ $averageResponseTime['minutes'] }}</span> menit)</p>
+        <p>Waktu Respons Rata-rata (Tugas Selesai): <span id="average-completed-response-time">{{ $averageCompletedResponseTime['formatted'] }}</span> (<span>{{ $averageCompletedResponseTime['minutes'] }}</span> menit)</p>
     </div>
 
     <h2>Status</h2>
@@ -74,55 +101,42 @@
         @endforeach
     </ul>
 
-    <h2>Unit Klinis</h2>
-    @if (!empty($unitCounts['Klinis']))
-        <ul>
-            @foreach ($unitCounts['Klinis'] as $unit => $count)
-                <li>{{ $unit }}: {{ $count }}</li>
-            @endforeach
-        </ul>
-    @else
-        <p>Tidak ada unit klinis yang ditemukan.</p>
-    @endif
-
-    <h2>Unit Non-Klinis</h2>
-    @if (!empty($unitCounts['Non-Klinis']))
-        <ul>
-            @foreach ($unitCounts['Non-Klinis'] as $unit => $count)
-                <li>{{ $unit }}: {{ $count }}</li>
-            @endforeach
-        </ul>
-    @else
-        <p>Tidak ada unit non-klinis yang ditemukan.</p>
-    @endif
-    
-    <h2>Unit Lainnya</h2>
-    @if (!empty($unitCounts['Lainnya']))
-        <ul>
-            @foreach ($unitCounts['Lainnya'] as $unit => $count)
-                <li>{{ $unit }}: {{ $count }}</li>
-            @endforeach
-        </ul>
-    @else
-        <p>Tidak ada unit lain yang ditemukan.</p>
-    @endif
-
-    
+    @foreach (['Klinis', 'Non-Klinis', 'Lainnya'] as $category)
+        <div class="unit-category">
+            <h2>Unit {{ $category }}</h2>
+            @if (!empty($unitCounts[$category]))
+                @foreach ($unitCounts[$category] as $unit => $statusCounts)
+                    <div class="unit-details">
+                        <h3>{{ $unit }}</h3>
+                        <ul class="status-details">
+                            @foreach ($statusCounts as $status => $count)
+                                <li>{{ $status }}: {{ $count }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endforeach
+            @else
+                <p>Tidak ada unit {{ strtolower($category) }} yang ditemukan.</p>
+            @endif
+        </div>
+    @endforeach
 
     @if (!empty($processedData))
-        <button onclick="downloadProcessedData()">Download Processed Data</button>
-
-        <pre><code>{{ print_r($processedData) }}</code></pre>
+        <button aria-label="Download Processed Data" onclick="downloadProcessedData()">Download Processed Data</button>
+        <pre><code>{{ json_encode($processedData, JSON_PRETTY_PRINT) }}</code></pre>
     @else
         <p>Data tidak tersedia atau terjadi kesalahan dalam pemrosesan.</p>
     @endif
 
-    
-
     <script>
         function downloadProcessedData() {
             fetch('{{ route('data.download') }}')
-                .then(response => response.blob())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.blob();
+                })
                 .then(blob => {
                     const url = window.URL.createObjectURL(blob);
                     const a = document.createElement('a');
