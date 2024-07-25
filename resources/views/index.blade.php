@@ -7,73 +7,17 @@
     <title>Processed Data</title>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@10"></script>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-            padding: 0;
-            background-color: #f5f5f5;
-        }
+        /* ... [Keep existing styles] ... */
 
-        h1, h2, h3 {
-            color: #333;
-        }
-
-        .summary-box {
-            background-color: #e9f7ef;
-            border: 1px solid #28a745;
-            border-radius: 5px;
-            padding: 15px;
+        .month-selector {
             margin-bottom: 20px;
         }
 
-        ul {
-            list-style-type: none;
-            padding: 0;
-        }
-
-        li {
-            margin: 5px 0;
-        }
-
-        button {
-            background-color: #007bff;
-            color: white;
-            border: none;
-            padding: 10px 20px;
+        select {
+            padding: 10px;
+            font-size: 16px;
             border-radius: 5px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-
-        button:hover {
-            background-color: #0056b3;
-        }
-
-        .unit-category {
-            margin-bottom: 30px;
-        }
-
-        .unit-details {
-            margin-left: 20px;
-        }
-
-        .status-details {
-            margin-left: 40px;
-        }
-
-        @media (max-width: 600px) {
-            body {
-                margin: 10px;
-            }
-
-            .summary-box, button {
-                width: 100%;
-                box-sizing: border-box;
-            }
-
-            .unit-details, .status-details {
-                margin-left: 10px;
-            }
+            border: 1px solid #ccc;
         }
     </style>
 </head>
@@ -81,8 +25,18 @@
 <body>
     <h1>Data Yang Diproses</h1>
 
+    <div class="month-selector">
+        <form action="{{ route('data.index') }}" method="GET">
+            <select name="month" onchange="this.form.submit()">
+                @foreach($availableMonths as $value => $label)
+                    <option value="{{ $value }}" {{ $value == $selectedMonth ? 'selected' : '' }}>{{ $label }}</option>
+                @endforeach
+            </select>
+        </form>
+    </div>
+
     <div class="summary-box">
-        <h2>Ringkasan</h2>
+        <h2>Ringkasan untuk {{ Carbon\Carbon::createFromFormat('Y-m', $selectedMonth)->format('F Y') }}</h2>
         <p>Waktu Respons Rata-rata (Semua): <span id="average-response-time">{{ $averageResponseTime['formatted'] }}</span> (<span>{{ $averageResponseTime['minutes'] }}</span> menit)</p>
         <p>Waktu Respons Rata-rata (Tugas Selesai): <span id="average-completed-response-time">{{ $averageCompletedResponseTime['formatted'] }}</span> (<span>{{ $averageCompletedResponseTime['minutes'] }}</span> menit)</p>
     </div>
@@ -130,7 +84,7 @@
 
     <script>
         function downloadProcessedData() {
-            fetch('{{ route('data.download') }}')
+            fetch('{{ route('data.download') }}?month={{ $selectedMonth }}')
                 .then(response => {
                     if (!response.ok) {
                         throw new Error('Network response was not ok');
@@ -141,7 +95,7 @@
                     const url = window.URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = 'processed_data.json';
+                    a.download = 'processed_data_{{ $selectedMonth }}.json';
                     document.body.appendChild(a);
                     a.click();
                     window.URL.revokeObjectURL(url);
@@ -149,7 +103,7 @@
                     Swal.fire({
                         icon: 'success',
                         title: 'Data berhasil diunduh',
-                        text: 'File processed_data.json berhasil diunduh!',
+                        text: 'File processed_data_{{ $selectedMonth }}.json berhasil diunduh!',
                         timer: 3000,
                         timerProgressBar: true,
                         showConfirmButton: false

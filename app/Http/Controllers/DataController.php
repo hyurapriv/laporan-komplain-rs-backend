@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Data;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -11,80 +12,123 @@ use Illuminate\Support\Facades\Storage;
 class DataController extends Controller
 {
     // Menampilkan data yang sudah diproses dan menyiapkan berbagai statistik
-    public function index()
+    public function index(Request $request)
     {
-        $processedData = $this->getProcessedData(); // Mendapatkan data yang telah diproses
-        $statusCounts = $this->getStatusCounts($processedData); // Menghitung jumlah status
-        $petugasCounts = $this->getPetugasCounts($processedData); // Menghitung jumlah petugas
-        $unitCounts = $this->getUnitCounts($processedData); // Menghitung jumlah unit/poli
-        $averageResponseTime = $this->calculateAverageResponseTime($processedData); // Menghitung waktu respon rata-rata
-        $averageCompletedResponseTime = $this->calculateAverageCompletedResponseTime($processedData); // Menghitung waktu respon rata-rata untuk yang selesai
+        $selectedMonth = $request->input('month', Carbon::now()->format('Y-m'));
+        $availableMonths = $this->getAvailableMonths();
 
-        // Mengkategorikan unit/poli ke dalam klinis dan non-klinis berdasarkan jumlah
-        $clinicalUnits = array_filter($unitCounts['Klinis'], function ($count) {
-            return $count > 0;
-        });
+        $processedData = $this->getProcessedData($selectedMonth);
+        $statusCounts = $this->getStatusCounts($processedData);
+        $petugasCounts = $this->getPetugasCounts($processedData);
+        $unitCounts = $this->getUnitCounts($processedData);
+        $averageResponseTime = $this->calculateAverageResponseTime($processedData);
+        $averageCompletedResponseTime = $this->calculateAverageCompletedResponseTime($processedData);
 
-        $nonClinicalUnits = array_filter($unitCounts['Non-Klinis'], function ($count) {
-            return $count > 0;
-        });
-
-        $otherUnits = $unitCounts['Lainnya'] ?? 0;
-
-        // Mengembalikan tampilan dengan data yang diproses dan statistik
         return view('index', compact(
             'processedData',
             'statusCounts',
             'petugasCounts',
-            'clinicalUnits',
-            'nonClinicalUnits',
-            'otherUnits',
             'unitCounts',
             'averageResponseTime',
-            'averageCompletedResponseTime'
+            'averageCompletedResponseTime',
+            'selectedMonth',
+            'availableMonths'
         ));
     }
 
-    // Mengunduh data yang sudah diproses sebagai file JSON
-    public function download()
-    {
-        $processedData = $this->getProcessedData(); // Mendapatkan data yang telah diproses
-        $fileName = 'processed_data.json'; // Nama file yang akan diunduh
-        Storage::put('public/' . $fileName, json_encode($processedData, JSON_PRETTY_PRINT)); // Menyimpan data dalam file JSON
 
-        return response()->download(storage_path('app/public/' . $fileName))->deleteFileAfterSend(true); // Mengunduh file dan menghapusnya setelah diunduh
+    // Mengunduh data yang sudah diproses sebagai file JSON
+    public function download(Request $request)
+    {
+        $selectedMonth = $request->input('month', Carbon::now()->format('Y-m'));
+        $processedData = $this->getProcessedData($selectedMonth);
+        $fileName = 'processed_data_' . $selectedMonth . '.json';
+        Storage::put('public/' . $fileName, json_encode($processedData, JSON_PRETTY_PRINT));
+
+        return response()->download(storage_path('app/public/' . $fileName))->deleteFileAfterSend(true);
     }
 
-    // Mendapatkan data yang telah diproses dari model Data
-    private function getProcessedData()
+    private function getAvailableMonths()
     {
-        return Data::where('form_id', 3)->get()->map(function ($data) {
-            $parsedJson = $data->json[0] ?? [];
-            $extractedData = $this->extractDataFromJson($parsedJson);
+        $months = Data::where('form_id', 3)
+            ->selectRaw('DATE_FORMAT(created_at, "%Y-%m") as month')
+            ->groupBy('month')
+            ->orderBy('month', 'desc')
+            ->pluck('month')
+            ->toArray();
 
-            $responTime = $this->calculateResponseTime($data->datetime_masuk, $data->datetime_selesai);
+        return array_combine($months, array_map(function ($month) {
+            return Carbon::createFromFormat('Y-m', $month)->format('F Y');
+        }, $months));
+    }
 
-            $date = Carbon::parse($data->created_at);
-            $month = $date->format('Y-m'); // Format YYYY-MM for month and year
-            $year = $date->format('Y'); // Year only
 
-            return [
-                'id' => $data->id,
-                'Nama Pelapor' => $extractedData['namaPelapor'],
-                'Nama Petugas' => $this->normalizePetugasNames($data->petugas),
-                'created_at' => $this->formatDateTime($data->created_at),
-                'datetime_masuk' => $this->formatDateTime($data->datetime_masuk),
-                'datetime_pengerjaan' => $this->formatDateTime($data->datetime_pengerjaan),
-                'datetime_selesai' => $this->formatDateTime($data->datetime_selesai),
-                'status' => $extractedData['status'] ?? $data->status ?? '',
-                'is_pending' => $data->is_pending,
-                'Nama Unit/Poli' => $this->normalizeUnitNames($extractedData['namaUnit']),
-                'respon_time' => $responTime['formatted'],
-                'respon_time_minutes' => $responTime['minutes'],
-                'month' => $month,
-                'year' => $year,
-            ];
-        })->toArray();
+    private function getProcessedData($selectedMonth)
+    {
+        $startDate = Carbon::createFromFormat('Y-m', $selectedMonth)->startOfMonth();
+        $endDate = Carbon::createFromFormat('Y-m', $selectedMonth)->endOfMonth();
+
+        return Data::where('form_id', 3)
+            ->whereBetween('created_at', [$startDate, $endDate])
+            ->get()
+            ->map(function ($data) {
+                $parsedJson = $data->json[0] ?? [];
+                $extractedData = $this->extractDataFromJson($parsedJson);
+
+                $responTime = $this->calculateResponseTime($data->datetime_masuk, $data->datetime_selesai);
+
+                return [
+                    'id' => $data->id,
+                    'Nama Pelapor' => $extractedData['namaPelapor'],
+                    'Nama Petugas' => $this->normalizePetugasNames($data->petugas),
+                    'created_at' => $this->formatDateTime($data->created_at),
+                    'datetime_masuk' => $this->formatDateTime($data->datetime_masuk),
+                    'datetime_pengerjaan' => $this->formatDateTime($data->datetime_pengerjaan),
+                    'datetime_selesai' => $this->formatDateTime($data->datetime_selesai),
+                    'status' => $extractedData['status'] ?? $data->status ?? '',
+                    'is_pending' => $data->is_pending,
+                    'Nama Unit/Poli' => $this->normalizeUnitNames($extractedData['namaUnit']),
+                    'respon_time' => $responTime['formatted'],
+                    'respon_time_minutes' => $responTime['minutes'],
+                ];
+            })->toArray();
+    }
+
+    private function fetchProcessedData($selectedMonth)
+    {
+        $startDate = Carbon::createFromFormat('Y-m', $selectedMonth)->startOfMonth();
+        $endDate = Carbon::createFromFormat('Y-m', $selectedMonth)->endOfMonth();
+
+        return Data::where('form_id', 3)
+            ->whereBetween('created_at', [$startDate, $endDate])
+            ->get()
+            ->map(function ($data) {
+                $parsedJson = $data->json[0] ?? [];
+                $extractedData = $this->extractDataFromJson($parsedJson);
+
+                $responTime = $this->calculateResponseTime($data->datetime_masuk, $data->datetime_selesai);
+
+                $date = Carbon::parse($data->created_at);
+                $month = $date->format('Y-m');
+                $year = $date->format('Y');
+
+                return [
+                    'id' => $data->id,
+                    'Nama Pelapor' => $extractedData['namaPelapor'],
+                    'Nama Petugas' => $this->normalizePetugasNames($data->petugas),
+                    'created_at' => $this->formatDateTime($data->created_at),
+                    'datetime_masuk' => $this->formatDateTime($data->datetime_masuk),
+                    'datetime_pengerjaan' => $this->formatDateTime($data->datetime_pengerjaan),
+                    'datetime_selesai' => $this->formatDateTime($data->datetime_selesai),
+                    'status' => $extractedData['status'] ?? $data->status ?? '',
+                    'is_pending' => $data->is_pending,
+                    'Nama Unit/Poli' => $this->normalizeUnitNames($extractedData['namaUnit']),
+                    'respon_time' => $responTime['formatted'],
+                    'respon_time_minutes' => $responTime['minutes'],
+                    'month' => $month,
+                    'year' => $year,
+                ];
+            })->toArray();
     }
 
 
@@ -388,13 +432,15 @@ class DataController extends Controller
 
 
     // Mendapatkan data komplain dan menyimpannya dalam cache selama 5 menit
-    public function getKomplainData()
+    public function getKomplainData($selectedMonth = null)
     {
-        $cachedData = Cache::remember('komplain-data', 5 * 60, function () {
-            $processedData = $this->getProcessedData(); // Mendapatkan data yang telah diproses
-            $statusCounts = $this->getStatusCounts($processedData); // Menghitung jumlah status
-            $averageResponseTime = $this->calculateAverageResponseTime($processedData); // Menghitung rata-rata waktu respon
-            $totalComplaints = count($processedData); // Menghitung total komplain
+        $selectedMonth = $selectedMonth ?? Carbon::now()->format('Y-m');
+
+        return Cache::remember("komplain-data-{$selectedMonth}", 5 * 60, function () use ($selectedMonth) {
+            $processedData = $this->fetchProcessedData($selectedMonth);
+            $statusCounts = $this->getStatusCounts($processedData);
+            $averageResponseTime = $this->calculateAverageResponseTime($processedData);
+            $totalComplaints = count($processedData);
 
             return [
                 'terkirim' => $statusCounts['Terkirim'] ?? 0,
@@ -405,8 +451,6 @@ class DataController extends Controller
                 'total' => $totalComplaints,
             ];
         });
-
-        return response()->json($cachedData); // Mengembalikan data dalam format JSON
     }
 
     // Memformat waktu dalam menit menjadi format jam dan menit
@@ -420,6 +464,12 @@ class DataController extends Controller
         } else {
             return sprintf("%d menit", $remainingMinutes);
         }
+    }
+
+    public function renderView($selectedMonth = null)
+    {
+        $data = $this->getProcessedData($selectedMonth);
+        return view('index', $data);
     }
 }
 
