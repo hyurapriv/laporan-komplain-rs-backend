@@ -391,4 +391,3 @@ class DataController extends Controller
 }
 
 //*if (stripos($data['Nama Unit/Poli'], 'it') !== false) { Log::info('Found IT:', ['unit' => $data['Nama Unit/Poli']]); }*//
- 
