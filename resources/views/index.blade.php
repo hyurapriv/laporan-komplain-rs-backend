@@ -107,6 +107,8 @@
         <p>Tidak ada unit lain yang ditemukan.</p>
     @endif
 
+    
+
     @if (!empty($processedData))
         <button onclick="downloadProcessedData()">Download Processed Data</button>
 
@@ -114,6 +116,8 @@
     @else
         <p>Data tidak tersedia atau terjadi kesalahan dalam pemrosesan.</p>
     @endif
+
+    
 
     <script>
         function downloadProcessedData() {

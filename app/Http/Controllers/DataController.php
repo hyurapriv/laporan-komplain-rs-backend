@@ -347,6 +347,34 @@ class DataController extends Controller
         ];
     }
 
+    private function groupDataByUnitAndStatus($processedData)
+{
+    $groupedData = [];
+
+    foreach ($processedData as $data) {
+        $unit = $data['Nama Unit/Poli'];
+        $status = $data['status'];
+
+        if (!isset($groupedData[$unit])) {
+            $groupedData[$unit] = [
+                'Terkirim' => 0,
+                'Dalam Pengerjaan / Pengecekan Petugas' => 0,
+                'Selesai' => 0,
+                'Pending' => 0,
+            ];
+        }
+
+        if (isset($groupedData[$unit][$status])) {
+            $groupedData[$unit][$status]++;
+        } else {
+            $groupedData[$unit]['Pending']++;
+        }
+    }
+
+    return $groupedData;
+}
+
+
     // Mendapatkan data komplain dan menyimpannya dalam cache selama 5 menit
     public function getKomplainData()
     {
