@@ -75,9 +75,9 @@
     </ul>
 
     <h2>Unit Klinis</h2>
-    @if (!empty($clinicalUnits))
+    @if (!empty($unitCounts['Klinis']))
         <ul>
-            @foreach ($clinicalUnits as $unit => $count)
+            @foreach ($unitCounts['Klinis'] as $unit => $count)
                 <li>{{ $unit }}: {{ $count }}</li>
             @endforeach
         </ul>
@@ -86,20 +86,20 @@
     @endif
 
     <h2>Unit Non-Klinis</h2>
-    @if (!empty($nonClinicalUnits))
+    @if (!empty($unitCounts['Non-Klinis']))
         <ul>
-            @foreach ($nonClinicalUnits as $unit => $count)
+            @foreach ($unitCounts['Non-Klinis'] as $unit => $count)
                 <li>{{ $unit }}: {{ $count }}</li>
             @endforeach
         </ul>
     @else
         <p>Tidak ada unit non-klinis yang ditemukan.</p>
     @endif
-
+    
     <h2>Unit Lainnya</h2>
-    @if (!empty($otherUnits))
+    @if (!empty($unitCounts['Lainnya']))
         <ul>
-            @foreach ($otherUnits as $unit => $count)
+            @foreach ($unitCounts['Lainnya'] as $unit => $count)
                 <li>{{ $unit }}: {{ $count }}</li>
             @endforeach
         </ul>
@@ -139,3 +139,14 @@
                 })
                 .catch(error => {
                     console.error('Error:', error);
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Gagal mengunduh data',
+                        text: 'Terjadi kesalahan saat mengunduh data. Silakan coba lagi nanti.',
+                    });
+                });
+        }
+    </script>
+</body>
+
+</html>
