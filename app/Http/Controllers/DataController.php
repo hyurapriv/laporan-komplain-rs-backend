@@ -10,24 +10,17 @@ use Illuminate\Support\Facades\Storage;
 
 class DataController extends Controller
 {
+    // Menampilkan data dan statistik ke tampilan index
     public function index()
     {
-        $processedData = [
-            // Contoh data
-            ['Nama Unit/Poli' => 'Poli Mata'],
-            ['Nama Unit/Poli' => 'Poli Bedah'],
-            ['Nama Unit/Poli' => 'Rekam Medis'],
-            ['Nama Unit/Poli' => 'ICU'],
-            // Tambahkan data lain sesuai kebutuhan
-        ];
+        $processedData = $this->getProcessedData(); // Ambil data yang telah diproses
+        $statusCounts = $this->getStatusCounts($processedData); // Hitung jumlah status
+        $petugasCounts = $this->getPetugasCounts($processedData); // Hitung jumlah petugas
+        $unitCounts = $this->getUnitCounts($processedData); // Hitung jumlah unit
+        $averageResponseTime = $this->calculateAverageResponseTime($processedData); // Hitung rata-rata waktu respons
+        $averageCompletedResponseTime = $this->calculateAverageCompletedResponseTime($processedData); // Hitung rata-rata waktu respons untuk yang selesai
 
-        $processedData = $this->getProcessedData();
-        $statusCounts = $this->getStatusCounts($processedData);
-        $petugasCounts = $this->getPetugasCounts($processedData);
-        $unitCounts = $this->getUnitCounts($processedData);
-        $averageResponseTime = $this->calculateAverageResponseTime($processedData);
-        $averageCompletedResponseTime = $this->calculateAverageCompletedResponseTime($processedData);
-
+        // Filter unit klinis dan non-klinis
         $clinicalUnits = array_filter($unitCounts['Klinis'], function ($count) {
             return $count > 0;
         });
@@ -38,11 +31,7 @@ class DataController extends Controller
 
         $otherUnits = $unitCounts['Lainnya'] ?? 0;
 
-        // Use dd() to debug and check if the variables have the expected data
-
-
-
-
+        // Kirimkan data ke tampilan index
         return view('index', compact(
             'processedData',
             'statusCounts',
@@ -56,41 +45,43 @@ class DataController extends Controller
         ));
     }
 
+    // Mengunduh data yang telah diproses dalam format JSON
     public function download()
     {
-        $processedData = $this->getProcessedData();
-        $fileName = 'processed_data.json';
-        Storage::put('public/' . $fileName, json_encode($processedData, JSON_PRETTY_PRINT));
+        $processedData = $this->getProcessedData(); // Ambil data yang telah diproses
+        $fileName = 'processed_data.json'; // Nama file JSON
+        Storage::put('public/' . $fileName, json_encode($processedData, JSON_PRETTY_PRINT)); // Simpan data ke file JSON
 
+        // Unduh file dan hapus setelah dikirim
         return response()->download(storage_path('app/public/' . $fileName))->deleteFileAfterSend(true);
     }
 
+    // Mengambil dan memproses data dari model Data
     private function getProcessedData()
     {
         return Data::where('form_id', 3)->get()->map(function ($data) {
-            $parsedJson = $data->json[0] ?? [];
-            $extractedData = $this->extractDataFromJson($parsedJson);
+            $parsedJson = $data->json[0] ?? []; // Ambil JSON yang ada
+            $extractedData = $this->extractDataFromJson($parsedJson); // Ekstrak data dari JSON
 
-            $responTime = $this->calculateResponseTime($data->datetime_masuk, $data->datetime_selesai);
+            $responTime = $this->calculateResponseTime($data->datetime_masuk, $data->datetime_selesai); // Hitung waktu respons
             return [
                 'id' => $data->id,
                 'Nama Pelapor' => $extractedData['namaPelapor'],
-                'Nama Petugas' => $this->normalizePetugasNames($data->petugas),
+                'Nama Petugas' => $this->normalizePetugasNames($data->petugas), // Normalisasi nama petugas
                 'created_at' => $this->formatDateTime($data->created_at),
                 'datetime_masuk' => $this->formatDateTime($data->datetime_masuk),
                 'datetime_pengerjaan' => $this->formatDateTime($data->datetime_pengerjaan),
                 'datetime_selesai' => $this->formatDateTime($data->datetime_selesai),
                 'status' => $extractedData['status'] ?? $data->status ?? '',
                 'is_pending' => $data->is_pending,
-                'Nama Unit/Poli' => $this->normalizeUnitNames($extractedData['namaUnit']),
+                'Nama Unit/Poli' => $this->normalizeUnitNames($extractedData['namaUnit']), // Normalisasi nama unit
                 'respon_time' => $responTime['formatted'],
                 'respon_time_minutes' => $responTime['minutes']
             ];
-        })->toArray();
+        })->toArray(); // Mengembalikan data yang telah diproses
     }
 
-
-
+    // Mengekstrak data dari JSON yang diparsing
     private function extractDataFromJson($parsedJson)
     {
         $data = ['namaPelapor' => '', 'namaUnit' => '', 'status' => ''];
@@ -112,6 +103,7 @@ class DataController extends Controller
         return $data;
     }
 
+    // Menormalisasi nama-nama petugas
     private function normalizePetugasNames($petugas)
     {
         $replacements = [
@@ -122,17 +114,18 @@ class DataController extends Controller
             'Virgie Dika' => 'Virgie, Adika', 'Virgie dikq' => 'Virgie, Adika',
         ];
 
-        $petugasList = preg_split('/\s*[,&]\s*|\s+dan\s+/i', $petugas);
+        $petugasList = preg_split('/\s*[,&]\s*|\s+dan\s+/i', $petugas); // Pisahkan nama petugas
         $normalizedList = array_map(function ($name) use ($replacements) {
             return $replacements[trim($name)] ?? trim($name);
         }, $petugasList);
 
-        return implode(', ', array_unique($normalizedList));
+        return implode(', ', array_unique($normalizedList)); // Gabungkan dan kembalikan nama petugas yang dinormalisasi
     }
 
+    // Menormalisasi nama unit/poli
     private function normalizeUnitNames($unit)
     {
-        // Regex pattern untuk mencocokkan frasa yang mengandung "poli mata"
+        // Pola regex untuk mencocokkan frasa yang mengandung "poli mata"
         $pattern = '/\b(?:poli\s*mata(?:\s*[\w\s]*)?)\b/i';
 
         // Jika unit sesuai dengan pola, kembalikan "Poli Mata"
@@ -144,6 +137,7 @@ class DataController extends Controller
         return ucfirst(strtolower($unit));
     }
 
+    // Menghitung jumlah petugas berdasarkan data yang diproses
     private function getPetugasCounts($processedData)
     {
         $petugasCounts = array_fill_keys(['Ganang', 'Agus', 'Ali Muhson', 'Virgie', 'Bayu', 'Adika'], 0);
@@ -157,9 +151,10 @@ class DataController extends Controller
             }
         }
 
-        return array_filter($petugasCounts);
+        return array_filter($petugasCounts); // Kembalikan jumlah petugas yang telah dihitung
     }
 
+    // Menghitung jumlah status dari data yang diproses
     private function getStatusCounts($processedData)
     {
         $statusCounts = ['pending' => 0, 'Selesai' => 0];
@@ -177,223 +172,166 @@ class DataController extends Controller
             }
         }
 
-        return $statusCounts;
+        return $statusCounts; // Kembalikan jumlah status yang telah dihitung
     }
 
+    // Menghitung jumlah unit berdasarkan kategori klinis, non-klinis, dan lainnya
     private function getUnitCounts($processedData)
-{
-    Log::info('Starting getUnitCounts function');
-    Log::info('Checking for Farmasi in input data');
-    foreach ($processedData as $data) {
-        if (stripos($data['Nama Unit/Poli'], 'farmasi') !== false) {
-            Log::info('Found Farmasi:', ['unit' => $data['Nama Unit/Poli']]);
+    {
+        Log::info('Starting getUnitCounts function'); // Log untuk debugging
+        Log::info('Checking for Farmasi in input data');
+        foreach ($processedData as $data) {
+            if (stripos($data['Nama Unit/Poli'], 'farmasi') !== false) {
+                Log::info('Found Farmasi:', ['unit' => $data['Nama Unit/Poli']]);
+            }
         }
         
-    }
-    $keywords = [
-        'Klinis' => [
-            'Rekam Medis' => ['rekam medis', 'rm'],
-            'Poli Mata' => ['mata'],
-            'Poli Bedah' => ['bedah'],
-            'Poli Obgyn' => ['obgyn'],
-            'Poli THT' => ['tht'],
-            'Poli Orthopedi' => ['orthopedi', 'ortopedi'],
-            'Poli Jantung' => ['jantung'],
-            'Poli Gigi' => ['gigi'],
-            'ICU' => ['icu'],
-            'Radiologi' => ['radiologi'],
-            'Perinatologi' => ['perinatologi', 'perina'],
-            'Rehabilitasi Medik' => ['rehabilitasi medik'],
-            'IGD' => ['igd'],
-        ],
-        'Non-Klinis' => [
-            'Kesehatan Lingkungan' => ['kesehatan lingkungan', 'kesling'],
-            'IBS' => ['ibs'],
-            'Farmasi' => ['farmasi'],
-            'Litbang' => ['litbang', 'ukm litbang'],
-            'ukm' => ['ukm'],
-            'Laboratorium & Pelayanan Darah' => ['laboratorium & pelayanan darah', 'laboratorium'],
-            'Kasir' => ['kasir'],
-            'IT' => ['it', 'I.T', 'I.T.'],
-            'Jamkes/Pojok JKN' => ['jamkes', 'pojok jkn', 'pojok jkn / loket bpjs', 'jamkes / pojok jkn'],
-            'Loket TPPRI' => ['loket tppri', 'tppri', 'tppri timur'],
-            'Anggrek' => ['anggrek', 'unit anggrek'],
-            'Akreditasi' => ['akreditasi'],
-            'Gizi' => ['gizi'],
-            'Ranap' => ['ranap'],
-            'Bugenvil' => ['bugenvil'],
-        ],
-        'Lainnya' => [
-            'TSE' => ['tse'],
-            'Maxime Deserunt Cumq' => ['maxime deserunt cumq'],
-            'Veritatis Voluptatem' => ['veritatis voluptatem'],
-            'Voluptas Enim Cupida' => ['voluptas enim cupida'],
-            'Enim Id Unde Sequi E' => ['enim id unde sequi e'],
-            'Est Iste Quam Dolore' => ['est iste quam dolore'],
-            'Tes' => ['tes'],
-        ],
-    ];
+        $keywords = [
+            'Klinis' => [
+                'Rekam Medis' => ['rekam medis', 'rm'],
+                'Poli Mata' => ['mata'],
+                'Poli Bedah' => ['bedah'],
+                'Poli Obgyn' => ['obgyn'],
+                'Poli THT' => ['tht'],
+                'Poli Orthopedi' => ['orthopedi', 'ortopedi'],
+                'Poli Jantung' => ['jantung'],
+                'Poli Gigi' => ['gigi'],
+                'ICU' => ['icu'],
+            ],
+            'Non-Klinis' => [
+                'Farmasi' => ['farmasi'],
+                'Laboratorium' => ['laboratorium'],
+                'Radiologi' => ['radiologi'],
+                'Administrasi' => ['administrasi'],
+            ]
+        ];
 
-    $unitCounts = [
-        'Klinis' => array_fill_keys(array_keys($keywords['Klinis']), 0),
-        'Non-Klinis' => array_fill_keys(array_keys($keywords['Non-Klinis']), 0),
-        'Lainnya' => array_fill_keys(array_keys($keywords['Lainnya']), 0),
-    ];
-    foreach ($processedData as $data) {
-        $unitName = strtolower($data['Nama Unit/Poli']);
-        $matched = false;
-
-        Log::info('Processing unit:', ['unit' => $unitName]);
-    if (stripos($unitName, 'farmasi') !== false) {
-        $unitCounts['Non-Klinis']['Farmasi']++;
-        $matched = true;
-        Log::info('Matched Farmasi:', ['unit' => $unitName]);
-        continue;  // Lanjut ke data berikutnya
-    }
-
-        foreach ($keywords as $category => $units) {
-            foreach ($units as $unit => $words) {
-                foreach ($words as $word) {
-                    if (stripos($unitName, $word) !== false) {
-                        $unitCounts[$category][$unit]++;
-                        $matched = true;
-                        Log::info("Matched {$category} unit:", ['unit' => $unit, 'word' => $word]);
-                        break 3;
+        $unitCounts = ['Klinis' => [], 'Non-Klinis' => [], 'Lainnya' => 0];
+        
+        foreach ($processedData as $data) {
+            $unit = $data['Nama Unit/Poli'];
+            $matched = false;
+            
+            foreach ($keywords as $category => $units) {
+                foreach ($units as $unitName => $unitKeywords) {
+                    foreach ($unitKeywords as $keyword) {
+                        if (stripos($unit, $keyword) !== false) {
+                            $unitCounts[$category][$unitName] = ($unitCounts[$category][$unitName] ?? 0) + 1;
+                            $matched = true;
+                            break 2; // Keluar dari loop keyword dan unit
+                        }
                     }
                 }
             }
+            
+            if (!$matched) {
+                $unitCounts['Lainnya']++;
+            }
         }
 
-        if (!$matched) {
-            if (!isset($unitCounts['Lainnya']['Lainnya'])) {
-                $unitCounts['Lainnya']['Lainnya'] = 0;
-            }
-            $unitCounts['Lainnya']['Lainnya']++;
-            Log::info('Unmatched unit:', ['unit' => $unitName]);
-        }
+        Log::info('Unit counts:', $unitCounts);
+        return $unitCounts; // Kembalikan jumlah unit yang telah dihitung
     }
 
-    Log::info('Final unit counts:', ['unitCounts' => $unitCounts]);
-    return $unitCounts;
-}
-
-
-
-
-    private function getCountsByKey($processedData, $key)
+    // Menghitung jumlah berdasarkan kunci tertentu dari data yang diproses
+    private function getCountsByKey($data, $key)
     {
         $counts = [];
-        foreach ($processedData as $data) {
-            $value = $data[$key] ?? '';
-            if (!empty($value)) {
-                $normalizedValue = strtolower($value);
-                $counts[$normalizedValue] = ($counts[$normalizedValue] ?? 0) + 1;
-            }
+        foreach ($data as $item) {
+            $value = $item[$key] ?? 'Unknown';
+            $counts[$value] = ($counts[$value] ?? 0) + 1;
         }
-        return $counts;
+        return $counts; // Kembalikan jumlah berdasarkan kunci yang dihitung
     }
 
+    // Memformat objek Carbon atau string menjadi format tanggal dan waktu
     private function formatDateTime($dateTime)
     {
-        return $dateTime instanceof Carbon ? $dateTime->toDateTimeString() : $dateTime;
+        return $dateTime instanceof Carbon ? $dateTime->format('d-m-Y H:i:s') : $dateTime;
     }
 
-    private function calculateResponseTime($datetimeMasuk, $datetimeSelesai)
+    // Menghitung waktu respons antara dua waktu
+    private function calculateResponseTime($start, $end)
     {
-        if (!$datetimeMasuk || !$datetimeSelesai) {
-            return ['minutes' => null, 'formatted' => 'N/A'];
-        }
-
-        $masuk = Carbon::parse($datetimeMasuk);
-        $selesai = Carbon::parse($datetimeSelesai);
-
-        // Calculate the difference in minutes
-        $diffInMinutes = $masuk->diffInMinutes($selesai);
+        $start = Carbon::parse($start);
+        $end = Carbon::parse($end);
+        $diff = $end->diff($start);
 
         return [
-            'minutes' => $diffInMinutes,
-            'formatted' => $this->formatMinutes($diffInMinutes)
+            'formatted' => $this->formatMinutes($diff->days * 24 * 60 + $diff->h * 60 + $diff->i), // Format waktu respons
+            'minutes' => $diff->days * 24 * 60 + $diff->h * 60 + $diff->i
         ];
     }
 
+    // Menghitung rata-rata waktu respons dari data yang diproses
     private function calculateAverageResponseTime($processedData)
     {
-        $totalResponseTime = 0;
-        $countValidResponseTimes = 0;
+        $totalMinutes = 0;
+        $count = 0;
 
         foreach ($processedData as $data) {
-            if ($data['respon_time_minutes'] !== null) {
-                $totalResponseTime += $data['respon_time_minutes'];
-                $countValidResponseTimes++;
+            if ($data['respon_time_minutes']) {
+                $totalMinutes += $data['respon_time_minutes'];
+                $count++;
             }
         }
 
-        $averageMinutes = $countValidResponseTimes > 0 ? $totalResponseTime / $countValidResponseTimes : 0;
-
-        return [
-            'minutes' => round($averageMinutes, 2),
-            'formatted' => $this->formatMinutes(round($averageMinutes))
-        ];
+        return $count ? $this->formatMinutes($totalMinutes / $count) : 'N/A'; // Hitung rata-rata waktu respons
     }
 
+    // Menghitung rata-rata waktu respons untuk data yang selesai
     private function calculateAverageCompletedResponseTime($processedData)
     {
-        $totalResponseTime = 0;
-        $countCompleted = 0;
+        $totalMinutes = 0;
+        $count = 0;
 
         foreach ($processedData as $data) {
-            if ($data['status'] === 'Selesai' && $data['respon_time_minutes'] !== null) {
-                $totalResponseTime += $data['respon_time_minutes'];
-                $countCompleted++;
+            if (!$data['is_pending'] && $data['respon_time_minutes']) {
+                $totalMinutes += $data['respon_time_minutes'];
+                $count++;
             }
         }
 
-        if ($countCompleted === 0) {
-            return ['minutes' => 0, 'formatted' => 'N/A'];
-        }
-
-        $averageMinutes = $totalResponseTime / $countCompleted;
-
-        return [
-            'minutes' => round($averageMinutes, 2),
-            'formatted' => $this->formatMinutes(round($averageMinutes))
-        ];
+        return $count ? $this->formatMinutes($totalMinutes / $count) : 'N/A'; // Hitung rata-rata waktu respons untuk yang selesai
     }
 
+    // Mengambil data komplain dengan caching
     public function getKomplainData()
     {
-        // Caching data for 5 minutes
-        $cachedData = Cache::remember('komplain-data', 5 * 60, function () {
-            $processedData = $this->getProcessedData();
-            $statusCounts = $this->getStatusCounts($processedData);
-            $averageResponseTime = $this->calculateAverageResponseTime($processedData);
-            $totalComplaints = count($processedData); // Calculate total complaints
-
-            return [
-                'terkirim' => $statusCounts['Terkirim'] ?? 0,
-                'proses' => $statusCounts['Dalam Pengerjaan / Pengecekan Petugas'] ?? 0,
-                'selesai' => $statusCounts['Selesai'] ?? 0,
-                'pending' => $statusCounts['pending'] ?? 0,
-                'responTime' => $averageResponseTime['formatted'],
-                'total' => $totalComplaints,
+        return Cache::remember('komplain_data', now()->addMinutes(10), function () {
+            $data = Data::where('form_id', 3)->get();
+            $counts = [
+                'Selesai' => 0,
+                'Pending' => 0,
+                'No Response Time' => 0,
             ];
-        });
 
-        return response()->json($cachedData);
+            foreach ($data as $item) {
+                $responseTime = $this->calculateResponseTime($item->datetime_masuk, $item->datetime_selesai);
+                if ($item->is_pending) {
+                    $counts['Pending']++;
+                } else {
+                    if ($responseTime['minutes']) {
+                        $counts['Selesai']++;
+                    } else {
+                        $counts['No Response Time']++;
+                    }
+                }
+            }
+
+            return $counts; // Kembalikan data komplain yang telah dihitung
+        });
     }
 
+    // Memformat jumlah menit menjadi format jam dan menit
     private function formatMinutes($minutes)
     {
         $hours = floor($minutes / 60);
-        $remainingMinutes = $minutes % 60;
-
-        if ($hours > 0) {
-            return sprintf("%d jam %d menit", $hours, $remainingMinutes);
-        } else {
-            return sprintf("%d menit", $remainingMinutes);
-        }
+        $minutes = $minutes % 60;
+        return sprintf('%02d:%02d', $hours, $minutes);
     }
 }
+
 
 
 //*if (stripos($data['Nama Unit/Poli'], 'it') !== false) { Log::info('Found IT:', ['unit' => $data['Nama Unit/Poli']]); }*//
