@@ -4,18 +4,13 @@ use App\Http\Controllers\DataController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-/*
-|--------------------------------------------------------------------------
-| API Routes
-|--------------------------------------------------------------------------
-|
-| Here is where you can register API routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "api" middleware group. Make something great!
-|
-*/
-
+// Middleware untuk autentikasi user
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
-Route::get('/komplain-data', [DataController::class, 'getKomplainData']);
+
+// Middleware rate limiting untuk endpoint API
+Route::middleware('throttle:2000,1')->group(function () {
+    Route::get('/komplain-data', [DataController::class, 'getKomplainData']);
+    Route::get('/available-dates', [DataController::class, 'getAvailableDates']);
+});
