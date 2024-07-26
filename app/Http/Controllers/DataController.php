@@ -203,100 +203,207 @@ class DataController extends Controller
     }
 
     // Menghitung jumlah status berdasarkan data yang telah diproses
-    private function getStatusCounts($processedData)
+    private function getUnitCounts($processedData)
     {
-        $statusCounts = ['pending' => 0, 'Selesai' => 0]; // Inisialisasi hitungan status
+        Log::info('Starting getUnitCounts function');
+
+        $keywords = [
+            'Non-Klinis' => [
+                'Farmasi' => ['farmasi'],
+                'Kesehatan Lingkungan' => ['kesehatan lingkungan', 'kesling'],
+                'IBS' => ['ibs'],
+                'Litbang' => ['litbang', 'ukm litbang'],
+                'Ukm' => ['ukm'],
+                'Laboratorium & Pelayanan Darah' => ['laboratorium & pelayanan darah', 'laboratorium'],
+                'Akreditasi' => ['akreditasi'],
+                'Kasir' => ['kasir'],
+                'Anggrek' => ['anggrek', 'unit anggrek'],
+                'Jamkes/Pojok JKN' => ['jamkes', 'pojok jkn', 'pojok jkn / loket bpjs', 'jamkes / pojok jkn'],
+                'SIMRS' => ['simrs'],
+                'Loket TPPRI' => ['loket tppri', 'tppri', 'tppri timur'],
+                'Gizi' => ['gizi'],
+                'Ranap' => ['ranap'],
+                'Bugenvil' => ['bugenvil'],
+                'IFRS' => ['ifrs'],
+                'Veritatis voluptatem' => ['veritatis voluptatem'],
+                'IT' => ['it'],
+            ],
+            'Klinis' => [
+                'Rekam Medis' => ['rekam medis', '\brm\b'],
+                'Poli Mata' => ['mata'],
+                'Poli Bedah' => ['bedah'],
+                'Poli Obgyn' => ['obgyn'],
+                'Poli THT' => ['tht'],
+                'Poli Orthopedi' => ['orthopedi', 'ortopedi'],
+                'Poli Jantung' => ['jantung'],
+                'Poli Gigi' => ['gigi'],
+                'ICU' => ['icu'],
+                'Radiologi' => ['radiologi'],
+                'Perinatologi' => ['perinatologi', 'perina'],
+                'Rehabilitasi Medik' => ['rehabilitasi medik'],
+                'IGD' => ['igd'],
+            ],
+            'Lainnya' => ['Lainnya' => []]
+        ];
+
+        $unitCounts = [
+            'Non-Klinis' => [],
+            'Klinis' => [],
+            'Lainnya' => []
+        ];
+
+        $statuses = ['Terkirim', 'Dalam Pengerjaan / Pengecekan Petugas', 'Selesai', 'Pending'];
 
         foreach ($processedData as $data) {
-            if ($data['is_pending']) {
-                if ($data['status'] === 'Selesai') {
-                    $statusCounts['Selesai']++;
+            $unitName = strtolower($data['Nama Unit/Poli']);
+            $status = $data['status'];
+            $isPending = $data['is_pending'];
+
+            // Logging untuk unit yang mengandung 'it'
+            if (stripos($unitName, 'it') !== false) {
+                Log::info('Found potential IT unit:', [
+                    'unitName' => $data['Nama Unit/Poli'],
+                    'status' => $status,
+                    'isPending' => $isPending
+                ]);
+            }
+
+            // Apply the logic for status
+            if ($isPending) {
+                if ($status === 'Selesai') {
+                    $status = 'Selesai';
                 } else {
-                    $statusCounts['pending']++;
+                    $status = 'Pending';
                 }
-            } else {
-                $status = $data['status'];
-                $statusCounts[$status] = ($statusCounts[$status] ?? 0) + 1; // Menghitung jumlah status
+            }
+
+            $matched = false;
+
+            foreach (['Non-Klinis', 'Klinis'] as $category) {
+                foreach ($keywords[$category] as $unit => $words) {
+                    foreach ($words as $word) {
+                        if ($unit === 'Rekam Medis' && $word === '\brm\b') {
+                            if (preg_match('/\brm\b/i', $unitName)) {
+                                $matched = true;
+                            }
+                        } elseif ($unit === 'IT') {
+                            // Penanganan khusus untuk unit IT
+                            if ($word === 'it' && preg_match('/\bit\b/i', $unitName)) {
+                                Log::info('Matched IT unit:', [
+                                    'unitName' => $data['Nama Unit/Poli'],
+                                    'status' => $status
+                                ]);
+                                $matched = true;
+                            }
+                        } elseif (stripos($unitName, $word) !== false) {
+                            $matched = true;
+                        }
+
+                        if ($matched) {
+                            if (!isset($unitCounts[$category][$unit])) {
+                                $unitCounts[$category][$unit] = array_fill_keys($statuses, 0);
+                            }
+                            $unitCounts[$category][$unit][$status]++;
+                            break 3;
+                        }
+                    }
+                }
+            }
+
+            if (!$matched) {
+                if (!isset($unitCounts['Lainnya']['Lainnya'])) {
+                    $unitCounts['Lainnya']['Lainnya'] = array_fill_keys($statuses, 0);
+                }
+                $unitCounts['Lainnya']['Lainnya'][$status]++;
             }
         }
 
-        return $statusCounts;
+        Log::info('Final unit counts:', ['unitCounts' => $unitCounts]);
+        return $unitCounts;
     }
 
     // Menghitung jumlah unit/poli berdasarkan data yang telah diproses
     private function getUnitCounts($processedData)
-{
-    Log::info('Starting getUnitCounts function');
+    {
+        Log::info('Starting getUnitCounts function');
 
-    $keywords = [
-        'Non-Klinis' => [
-            'Farmasi' => ['farmasi'],
-            'Kesehatan Lingkungan' => ['kesehatan lingkungan', 'kesling'],
-            'IBS' => ['ibs'],
-            'Litbang' => ['litbang', 'ukm litbang'],
-            'Ukm' => ['ukm'],
-            'Laboratorium & Pelayanan Darah' => ['laboratorium & pelayanan darah', 'laboratorium'],
-            'Akreditasi' => ['akreditasi'],
-            'Kasir' => ['kasir'],
-            'Anggrek' => ['anggrek', 'unit anggrek'],
-            'Jamkes/Pojok JKN' => ['jamkes', 'pojok jkn', 'pojok jkn / loket bpjs', 'jamkes / pojok jkn'],
-            'SIMRS' => ['simrs'],
-            'Loket TPPRI' => ['loket tppri', 'tppri', 'tppri timur'],
-            'Gizi' => ['gizi'],
-            'Ranap' => ['ranap'],
-            'Bugenvil' => ['bugenvil'],
-            'IFRS' => ['ifrs'],
-            'Veritatis voluptatem' => ['veritatis voluptatem'],
-            'IT' => ['it'],
-        ],
-        'Klinis' => [
-            'Rekam Medis' => ['rekam medis', '\brm\b'],
-            'Poli Mata' => ['mata'],
-            'Poli Bedah' => ['bedah'],
-            'Poli Obgyn' => ['obgyn'],
-            'Poli THT' => ['tht'],
-            'Poli Orthopedi' => ['orthopedi', 'ortopedi'],
-            'Poli Jantung' => ['jantung'],
-            'Poli Gigi' => ['gigi'],
-            'ICU' => ['icu'],
-            'Radiologi' => ['radiologi'],
-            'Perinatologi' => ['perinatologi', 'perina'],
-            'Rehabilitasi Medik' => ['rehabilitasi medik'],
-            'IGD' => ['igd'],
-        ],
-        'Lainnya' => ['Lainnya' => []]
-    ];
+        $keywords = [
+            'Non-Klinis' => [
+                'Farmasi' => ['farmasi'],
+                'Kesehatan Lingkungan' => ['kesehatan lingkungan', 'kesling'],
+                'IBS' => ['ibs'],
+                'Litbang' => ['litbang', 'ukm litbang'],
+                'Ukm' => ['ukm'],
+                'Laboratorium & Pelayanan Darah' => ['laboratorium & pelayanan darah', 'laboratorium'],
+                'Akreditasi' => ['akreditasi'],
+                'Kasir' => ['kasir'],
+                'Anggrek' => ['anggrek', 'unit anggrek'],
+                'Jamkes/Pojok JKN' => ['jamkes', 'pojok jkn', 'pojok jkn / loket bpjs', 'jamkes / pojok jkn'],
+                'SIMRS' => ['simrs'],
+                'Loket TPPRI' => ['loket tppri', 'tppri', 'tppri timur'],
+                'Gizi' => ['gizi'],
+                'Ranap' => ['ranap'],
+                'Bugenvil' => ['bugenvil'],
+                'IFRS' => ['ifrs'],
+                'Veritatis voluptatem' => ['veritatis voluptatem'],
+                'IT' => ['it'],
+            ],
+            'Klinis' => [
+                'Rekam Medis' => ['rekam medis', '\brm\b'],
+                'Poli Mata' => ['mata'],
+                'Poli Bedah' => ['bedah'],
+                'Poli Obgyn' => ['obgyn'],
+                'Poli THT' => ['tht'],
+                'Poli Orthopedi' => ['orthopedi', 'ortopedi'],
+                'Poli Jantung' => ['jantung'],
+                'Poli Gigi' => ['gigi'],
+                'ICU' => ['icu'],
+                'Radiologi' => ['radiologi'],
+                'Perinatologi' => ['perinatologi', 'perina'],
+                'Rehabilitasi Medik' => ['rehabilitasi medik'],
+                'IGD' => ['igd'],
+            ],
+            'Lainnya' => ['Lainnya' => []]
+        ];
 
-    $unitCounts = [
-        'Non-Klinis' => [],
-        'Klinis' => [],
-        'Lainnya' => []
-    ];
+        $unitCounts = [
+            'Non-Klinis' => [],
+            'Klinis' => [],
+            'Lainnya' => []
+        ];
 
-    $statuses = ['Terkirim', 'Dalam Pengerjaan / Pengecekan Petugas', 'Selesai', 'Pending'];
+        $statuses = ['Terkirim', 'Dalam Pengerjaan / Pengecekan Petugas', 'Selesai', 'Pending'];
 
-    foreach ($processedData as $data) {
-        $unitName = strtolower($data['Nama Unit/Poli']);
-        $status = $data['status'];
-        $isPending = $data['is_pending'];
+        foreach ($processedData as $data) {
+            $unitName = strtolower($data['Nama Unit/Poli']);
+            $status = $data['status'];
+            $isPending = $data['is_pending'];
 
-        // Apply the logic for status
-        if ($isPending) {
-            if ($status === 'Selesai') {
-                $status = 'Selesai';
-            } else {
-                $status = 'Pending';
+            // Apply the logic for status
+            if ($isPending) {
+                if ($status === 'Selesai') {
+                    $status = 'Selesai';
+                } else {
+                    $status = 'Pending';
+                }
             }
-        }
 
-        $matched = false;
+            $matched = false;
 
-        foreach (['Non-Klinis', 'Klinis'] as $category) {
-            foreach ($keywords[$category] as $unit => $words) {
-                foreach ($words as $word) {
-                    if ($unit === 'Rekam Medis' && $word === '\brm\b') {
-                        // Use preg_match for 'rm' to match only as a whole word
-                        if (preg_match('/\brm\b/i', $unitName)) {
+            foreach (['Non-Klinis', 'Klinis'] as $category) {
+                foreach ($keywords[$category] as $unit => $words) {
+                    foreach ($words as $word) {
+                        if ($unit === 'Rekam Medis' && $word === '\brm\b') {
+                            // Use preg_match for 'rm' to match only as a whole word
+                            if (preg_match('/\brm\b/i', $unitName)) {
+                                if (!isset($unitCounts[$category][$unit])) {
+                                    $unitCounts[$category][$unit] = array_fill_keys($statuses, 0);
+                                }
+                                $unitCounts[$category][$unit][$status]++;
+                                $matched = true;
+                                break 3;
+                            }
+                        } elseif (stripos($unitName, $word) !== false) {
                             if (!isset($unitCounts[$category][$unit])) {
                                 $unitCounts[$category][$unit] = array_fill_keys($statuses, 0);
                             }
@@ -304,29 +411,21 @@ class DataController extends Controller
                             $matched = true;
                             break 3;
                         }
-                    } elseif (stripos($unitName, $word) !== false) {
-                        if (!isset($unitCounts[$category][$unit])) {
-                            $unitCounts[$category][$unit] = array_fill_keys($statuses, 0);
-                        }
-                        $unitCounts[$category][$unit][$status]++;
-                        $matched = true;
-                        break 3;
                     }
                 }
             }
-        }
 
-        if (!$matched) {
-            if (!isset($unitCounts['Lainnya']['Lainnya'])) {
-                $unitCounts['Lainnya']['Lainnya'] = array_fill_keys($statuses, 0);
+            if (!$matched) {
+                if (!isset($unitCounts['Lainnya']['Lainnya'])) {
+                    $unitCounts['Lainnya']['Lainnya'] = array_fill_keys($statuses, 0);
+                }
+                $unitCounts['Lainnya']['Lainnya'][$status]++;
             }
-            $unitCounts['Lainnya']['Lainnya'][$status]++;
         }
-    }
 
-    Log::info('Final unit counts:', ['unitCounts' => $unitCounts]);
-    return $unitCounts;
-}
+        Log::info('Final unit counts:', ['unitCounts' => $unitCounts]);
+        return $unitCounts;
+    }
 
 
     // Menghitung jumlah berdasarkan kunci dari data yang telah diproses
