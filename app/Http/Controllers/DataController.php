@@ -70,12 +70,14 @@ class DataController extends Controller
         $startDate = Carbon::createFromFormat('Y-m', $selectedMonth)->startOfMonth();
         $endDate = Carbon::createFromFormat('Y-m', $selectedMonth)->endOfMonth();
 
-        return Data::where('form_id', 3)
+        // Ambil data yang telah diproses dari database
+        $data = Data::where('form_id', 3)
             ->whereBetween('created_at', [$startDate, $endDate])
             ->get()
             ->map(function ($data) {
                 $parsedJson = $data->json[0] ?? [];
                 $extractedData = $this->extractDataFromJson($parsedJson);
+                $categorizedUnits = $this->categorizeKomplainData($data);
 
                 $responTime = $this->calculateResponseTime($data->datetime_masuk, $data->datetime_selesai);
 
@@ -92,9 +94,27 @@ class DataController extends Controller
                     'Nama Unit/Poli' => $this->normalizeUnitNames($extractedData['namaUnit']),
                     'respon_time' => $responTime['formatted'],
                     'respon_time_minutes' => $responTime['minutes'],
+                    'categorizedUnits' => $categorizedUnits
                 ];
             })->toArray();
+
+        Log::info('Processed Data:', ['data' => $data]);
+
+        // Ambil unit dari data yang telah diproses
+        $units = array_column($data, 'Nama Unit/Poli');
+        Log::info('Units:', ['units' => $units]);
+
+        // Kelompokkan unit menggunakan fungsi categorizeUnits
+        $categorizedUnits = $this->categorizeUnits($units);
+        Log::info('Categorized Units:', ['categorizedUnits' => $categorizedUnits]);
+
+        // Tambahkan hasil pengelompokan unit ke dalam data yang telah diproses
+        return [
+            'data' => $data,
+            'categorizedUnits' => $categorizedUnits
+        ];
     }
+
 
     private function fetchProcessedData($selectedMonth)
     {
@@ -419,16 +439,17 @@ class DataController extends Controller
         }
 
         if ($countCompleted === 0) {
-            return ['minutes' => 0, 'formatted' => 'N/A']; // Jika tidak ada data yang selesai, kembalikan nilai N/A
+            return ['minutes' => 0, 'formatted' => 'N/A'];
         }
 
         $averageMinutes = $totalResponseTime / $countCompleted;
 
         return [
             'minutes' => round($averageMinutes, 2),
-            'formatted' => $this->formatMinutes(round($averageMinutes)) // Mengembalikan rata-rata waktu respon yang diformat
+            'formatted' => $this->formatMinutes(round($averageMinutes))
         ];
     }
+
 
     private function groupDataByUnitAndStatus($processedData)
     {
@@ -458,35 +479,163 @@ class DataController extends Controller
     }
 
 
-    // Mendapatkan data komplain dan menyimpannya dalam cache selama 5 menit
-    public function getKomplainData(Request $request)
+    public function categorizeUnits(array $units)
+    {
+        // Definisikan kategori dan unit yang sesuai
+        $categories = [
+            'Klinis' => [
+                'Rekam Medis' => ['rekam medis', 'rm'],
+                'Poli Mata' => ['mata'],
+                'Poli Bedah' => ['bedah'],
+                'Poli Obgyn' => ['obgyn'],
+                'Poli THT' => ['tht'],
+                'Poli Orthopedi' => ['orthopedi', 'ortopedi'],
+                'Poli Jantung' => ['jantung'],
+                'Poli Gigi' => ['gigi'],
+                'ICU' => ['icu'],
+                'Radiologi' => ['radiologi'],
+                'Perinatologi' => ['perinatologi', 'perina'],
+                'Rehabilitasi Medik' => ['rehabilitasi medik'],
+                'IGD' => ['igd'],
+            ],
+            'Non-Klinis' => [
+                'Farmasi' => ['farmasi'],
+                'Kesehatan Lingkungan' => ['kesehatan lingkungan', 'kesling'],
+                'IBS' => ['ibs'],
+                'Litbang' => ['litbang', 'ukm litbang'],
+                'Ukm' => ['ukm'],
+                'Laboratorium & Pelayanan Darah' => ['laboratorium & pelayanan darah', 'laboratorium'],
+                'Akreditasi' => ['akreditasi'],
+                'Kasir' => ['kasir'],
+                'Anggrek' => ['anggrek', 'unit anggrek'],
+                'Jamkes/Pojok JKN' => ['jamkes', 'pojok jkn', 'pojok jkn / loket bpjs', 'jamkes / pojok jkn'],
+                'SIMRS' => ['simrs'],
+                'Loket TPPRI' => ['loket tppri', 'tppri', 'tppri timur'],
+                'Gizi' => ['gizi'],
+                'Ranap' => ['ranap'],
+                'Bugenvil' => ['bugenvil'],
+                'IFRS' => ['ifrs'],
+                'Veritatis voluptatem' => ['veritatis voluptatem'],
+                'IT' => ['it'],
+            ],
+        ];
+
+        // Variabel untuk menyimpan hasil pengelompokan
+        $categorizedUnits = [
+            'Klinis' => [],
+            'Non-Klinis' => [],
+            'Lainnya' => [],
+        ];
+
+        // Fungsi untuk memeriksa apakah unit cocok dengan pola
+        $matchesCategory = function ($unitName, $patterns) {
+            foreach ($patterns as $pattern) {
+                if (stripos($unitName, $pattern) !== false) {
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        // Kelompokkan unit
+        foreach ($units as $unit) {
+            // Log unit yang diproses
+            Log::info('Processing unit:', ['unit' => $unit]);
+
+            $found = false;
+            foreach ($categories as $category => $categoryUnits) {
+                foreach ($categoryUnits as $subCategory => $patterns) {
+                    if ($matchesCategory($unit, $patterns)) {
+                        $categorizedUnits[$category][$subCategory][] = $unit;
+                        $found = true;
+                        break 2; // Keluar dari kedua loop jika cocok
+                    }
+                }
+            }
+            if (!$found) {
+                $categorizedUnits['Lainnya'][] = $unit;
+            }
+        }
+
+        return $categorizedUnits;
+    }
+
+    public function categorizeKomplainData($komplainData)
 {
-    $selectedMonth = $request->input('month', Carbon::now()->format('Y-m'));
-    Log::info('Selected Month:', ['month' => $selectedMonth]);
+    // Inisialisasi jumlah komplain untuk setiap kategori
+    $categoryCounts = [
+        'Klinis' => 0,
+        'Non-Klinis' => 0,
+        'Lainnya' => 0
+    ];
 
-    $processedData = $this->getProcessedData($selectedMonth);
-    Log::info('Processed Data:', ['data' => $processedData]);
+    // Pastikan $komplainData adalah array atau objek yang dapat diiterasi
+    if (!is_array($komplainData) && !($komplainData instanceof \Traversable)) {
+        Log::error('Invalid komplainData type:', ['type' => gettype($komplainData)]);
+        return $categoryCounts;
+    }
 
-    $statusCounts = $this->getStatusCounts($processedData);
-    $petugasCounts = $this->getPetugasCounts($processedData);
-    $unitCounts = $this->getUnitCounts($processedData);
-    $averageResponseTime = $this->calculateAverageResponseTime($processedData);
-    $averageCompletedResponseTime = $this->calculateAverageCompletedResponseTime($processedData);
+    // Iterasi melalui data komplain
+    foreach ($komplainData as $komplain) {
+        // Pastikan $komplain adalah objek dan memiliki properti unit_type
+        if (!is_object($komplain) || !property_exists($komplain, 'unit_type')) {
+            Log::warning('Invalid komplain object:', ['komplain' => $komplain]);
+            continue;
+        }
 
-    return response()->json([
-        'processedData' => $processedData,
-        'statusCounts' => $statusCounts,
-        'petugasCounts' => $petugasCounts,
-        'unitCounts' => $unitCounts,
-        'averageResponseTime' => $averageResponseTime,
-        'averageCompletedResponseTime' => $averageCompletedResponseTime,
-        'selectedMonth' => $selectedMonth,
-        'availableMonths' => $this->getAvailableMonths(),
-    ]);
+        // Dapatkan tipe unit dari komplain
+        $unitType = $komplain->unit_type;
+
+        // Kategorikan data komplain berdasarkan tipe unit
+        if ($unitType === 'Klinis') {
+            $categoryCounts['Klinis']++;
+        } elseif ($unitType === 'Non-Klinis') {
+            $categoryCounts['Non-Klinis']++;
+        } else {
+            $categoryCounts['Lainnya']++;
+        }
+    }
+
+    return $categoryCounts;
 }
 
 
 
+
+
+    // Mendapatkan data komplain dan menyimpannya dalam cache selama 5 menit
+    public function getKomplainData(Request $request)
+    {
+        $selectedMonth = $request->input('month', Carbon::now()->format('Y-m'));
+        Log::info('Selected Month:', ['month' => $selectedMonth]);
+
+        try {
+            $processedData = $this->getProcessedData($selectedMonth);
+            $data = $processedData['data'];
+            $categorizedUnits = $processedData['categorizedUnits'];
+
+            $statusCounts = $this->getStatusCounts($data);
+            $petugasCounts = $this->getPetugasCounts($data);
+            $unitCounts = $this->getUnitCounts($data);
+            $averageResponseTime = $this->calculateAverageResponseTime($data);
+            $averageCompletedResponseTime = $this->calculateAverageCompletedResponseTime($data);
+
+            return response()->json([
+                'totalComplaints' => count($data),
+                'statusCounts' => $statusCounts,
+                'petugasCounts' => $petugasCounts,
+                'categorizedUnits' => $categorizedUnits,
+                'unitCounts' => $unitCounts,
+                'averageResponseTime' => $averageResponseTime,
+                'averageCompletedResponseTime' => $averageCompletedResponseTime,
+                'selectedMonth' => $selectedMonth,
+                'availableMonths' => $this->getAvailableMonths(),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error processing request:', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'Server Error: ' . $e->getMessage()], 500);
+        }
+    }
 
 
     // Memformat waktu dalam menit menjadi format jam dan menit
