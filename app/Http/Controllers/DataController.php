@@ -612,7 +612,7 @@ class DataController extends Controller
         try {
             $processedData = $this->getProcessedData($selectedMonth);
             $data = $processedData['data'];
-            $categorizedUnits = $processedData['categorizedUnits'];
+            // $categorizedUnits = $processedData['categorizedUnits'];
 
             $statusCounts = $this->getStatusCounts($data);
             $petugasCounts = $this->getPetugasCounts($data);
@@ -624,7 +624,7 @@ class DataController extends Controller
                 'totalComplaints' => count($data),
                 'statusCounts' => $statusCounts,
                 'petugasCounts' => $petugasCounts,
-                'categorizedUnits' => $categorizedUnits,
+                // 'categorizedUnits' => $categorizedUnits,
                 'unitCounts' => $unitCounts,
                 'averageResponseTime' => $averageResponseTime,
                 'averageCompletedResponseTime' => $averageCompletedResponseTime,
