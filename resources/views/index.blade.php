@@ -7,7 +7,25 @@
     <title>Processed Data</title>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@10"></script>
     <style>
-        /* ... [Keep existing styles] ... */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1, h2 {
+            color: #2c3e50;
+        }
+
+        .summary-box {
+            background-color: #fff;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+        }
 
         .month-selector {
             margin-bottom: 20px;
@@ -18,6 +36,28 @@
             font-size: 16px;
             border-radius: 5px;
             border: 1px solid #ccc;
+        }
+
+        pre {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            overflow-x: auto;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            background-color: #3498db;
+            color: #fff;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #2980b9;
         }
     </style>
 </head>
@@ -36,87 +76,38 @@
     </div>
 
     <div class="summary-box">
-        <h2>Ringkasan untuk {{ Carbon\Carbon::createFromFormat('Y-m', $selectedMonth)->format('F Y') }}</h2>
-        <p>Waktu Respons Rata-rata (Semua): <span id="average-response-time">{{ $averageResponseTime['formatted'] }}</span> (<span>{{ $averageResponseTime['minutes'] }}</span> menit)</p>
-        <p>Waktu Respons Rata-rata (Tugas Selesai): <span id="average-completed-response-time">{{ $averageCompletedResponseTime['formatted'] }}</span> (<span>{{ $averageCompletedResponseTime['minutes'] }}</span> menit)</p>
+        <h2>Ringkasan untuk {{ \Carbon\Carbon::createFromFormat('Y-m', $selectedMonth)->format('F Y') }}</h2>
+        {{-- Tampilkan ringkasan statistik jika diperlukan --}}
     </div>
 
-    <h2>Status</h2>
-    <ul>
-        @foreach ($statusCounts as $status => $count)
-            <li>{{ $status }}: {{ $count }}</li>
-        @endforeach
-    </ul>
-
-    <h2>Petugas</h2>
-    <ul>
-        @foreach ($petugasCounts as $petugas => $count)
-            <li>{{ $petugas }}: {{ $count }}</li>
-        @endforeach
-    </ul>
-
-    @foreach (['Klinis', 'Non-Klinis', 'Lainnya'] as $category)
-        <div class="unit-category">
-            <h2>Unit {{ $category }}</h2>
-            @if (!empty($unitCounts[$category]))
-                @foreach ($unitCounts[$category] as $unit => $statusCounts)
-                    <div class="unit-details">
-                        <h3>{{ $unit }}</h3>
-                        <ul class="status-details">
-                            @foreach ($statusCounts as $status => $count)
-                                <li>{{ $status }}: {{ $count }}</li>
-                            @endforeach
-                        </ul>
-                    </div>
-                @endforeach
-            @else
-                <p>Tidak ada unit {{ strtolower($category) }} yang ditemukan.</p>
-            @endif
-        </div>
-    @endforeach
-
-    @if (!empty($processedData))
-        <button aria-label="Download Processed Data" onclick="downloadProcessedData()">Download Processed Data</button>
-        <pre><code>{{ json_encode($processedData, JSON_PRETTY_PRINT) }}</code></pre>
-    @else
+    <h2>Data Yang Diproses</h2>
+    @if (empty($data))
         <p>Data tidak tersedia atau terjadi kesalahan dalam pemrosesan.</p>
+    @else
+        <pre><code>{{ json_encode($data, JSON_PRETTY_PRINT) }}</code></pre>
     @endif
+
+    <button onclick="downloadProcessedData()">Download Processed Data</button>
 
     <script>
         function downloadProcessedData() {
-            fetch('{{ route('data.download') }}?month={{ $selectedMonth }}')
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Network response was not ok');
-                    }
-                    return response.blob();
-                })
-                .then(blob => {
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = 'processed_data_{{ $selectedMonth }}.json';
-                    document.body.appendChild(a);
-                    a.click();
-                    window.URL.revokeObjectURL(url);
+            const data = @json($data);
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'processed_data_{{ $selectedMonth }}.json';
+            a.click();
+            URL.revokeObjectURL(url);
 
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Data berhasil diunduh',
-                        text: 'File processed_data_{{ $selectedMonth }}.json berhasil diunduh!',
-                        timer: 3000,
-                        timerProgressBar: true,
-                        showConfirmButton: false
-                    });
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Gagal mengunduh data',
-                        text: 'Terjadi kesalahan saat mengunduh data. Silakan coba lagi nanti.',
-                    });
-                });
+            Swal.fire({
+                icon: 'success',
+                title: 'Data berhasil diunduh',
+                text: 'File processed_data_{{ $selectedMonth }}.json berhasil diunduh!',
+                timer: 3000,
+                timerProgressBar: true,
+                showConfirmButton: false
+            });
         }
     </script>
 </body>

@@ -54,7 +54,7 @@ class DataController extends Controller
 
         try {
             $data = $this->getProcessedData($selectedMonth);
-            
+
             return response()->json([
                 'totalComplaints' => count($data),
                 'statusCounts' => $this->getStatusCounts($data),
@@ -64,11 +64,40 @@ class DataController extends Controller
                 'averageCompletedResponseTime' => $this->calculateAverageCompletedResponseTime($data),
                 'selectedMonth' => $selectedMonth,
                 'availableMonths' => $this->getAvailableMonths(),
+                'monthlyData' => $this->getMonthlyData($selectedMonth),
             ]);
         } catch (\Exception $e) {
             Log::error('Error processing request:', ['error' => $e->getMessage()]);
             return response()->json(['message' => 'Server Error: ' . $e->getMessage()], 500);
         }
+    }
+
+    private function getMonthlyData($selectedMonth)
+    {
+        $startDate = Carbon::createFromFormat('Y-m', $selectedMonth)->startOfMonth();
+        $endDate = Carbon::createFromFormat('Y-m', $selectedMonth)->endOfMonth();
+
+        $data = Data::where('form_id', 3)
+            ->whereBetween('created_at', [$startDate, $endDate])
+            ->get();
+
+        $dailyData = [];
+        $currentDate = $startDate->copy();
+
+        while ($currentDate <= $endDate) {
+            $dailyCount = $data->filter(function ($item) use ($currentDate) {
+                return $item->created_at->format('Y-m-d') === $currentDate->format('Y-m-d');
+            })->count();
+
+            $dailyData[] = [
+                'date' => $currentDate->format('Y-m-d'),
+                'count' => $dailyCount
+            ];
+
+            $currentDate->addDay();
+        }
+
+        return $dailyData;
     }
 
     private function getProcessedData($selectedMonth)
@@ -94,7 +123,7 @@ class DataController extends Controller
                     'datetime_selesai' => $this->formatDateTime($data->datetime_selesai),
                     'status' => $extractedData['status'] ?? $data->status ?? '',
                     'is_pending' => $data->is_pending,
-                    'Nama Unit/Poli' => $this->normalizeUnitNames($extractedData['namaUnit']),
+                    'Nama Unit/Poli' => $extractedData['namaUnit'],
                     'respon_time' => $responTime['formatted'],
                     'respon_time_minutes' => $responTime['minutes'],
                 ];
@@ -110,8 +139,8 @@ class DataController extends Controller
                     case 'text-1709615631557-0':
                         $data['namaPelapor'] = $item['value'];
                         break;
-                    case 'text-1709615712000-0':
-                        $data['namaUnit'] = $item['value'];
+                    case 'select-1722845859503-0': // Nama baru untuk field unit
+                        $data['namaUnit'] = $this->getSelectedUnitName($item['values']);
                         break;
                     case 'Status':
                         $data['status'] = $item['value'];
@@ -122,14 +151,34 @@ class DataController extends Controller
         return $data;
     }
 
+    private function getSelectedUnitName($values)
+    {
+        foreach ($values as $value) {
+            if (isset($value['selected']) && $value['selected'] == 1) {
+                return $value['label'];
+            }
+        }
+        return 'Tidak Diketahui';
+    }
+
+
     private function normalizePetugasNames($petugas)
     {
         $replacements = [
-            'Adi' => 'Adika', 'Adika Wicaksana' => 'Adika', 'Adikaka' => 'Adika',
-            'adikaka' => 'Adika', 'dika' => 'Adika', 'Dika' => 'Adika',
-            'dikq' => 'Adika', 'Dikq' => 'Adika', 'AAdika' => 'Adika',
-            'virgie' => 'Virgie', 'Vi' => 'Virgie', 'vi' => 'Virgie',
-            'Virgie Dika' => 'Virgie, Adika', 'Virgie dikq' => 'Virgie, Adika',
+            'Adi' => 'Adika',
+            'Adika Wicaksana' => 'Adika',
+            'Adikaka' => 'Adika',
+            'adikaka' => 'Adika',
+            'dika' => 'Adika',
+            'Dika' => 'Adika',
+            'dikq' => 'Adika',
+            'Dikq' => 'Adika',
+            'AAdika' => 'Adika',
+            'virgie' => 'Virgie',
+            'Vi' => 'Virgie',
+            'vi' => 'Virgie',
+            'Virgie Dika' => 'Virgie, Adika',
+            'Virgie dikq' => 'Virgie, Adika',
         ];
 
         $petugasList = preg_split('/\s*[,&]\s*|\s+dan\s+/i', $petugas);
@@ -180,32 +229,28 @@ class DataController extends Controller
         $statuses = ['Terkirim', 'Dalam Pengerjaan / Pengecekan Petugas', 'Selesai', 'Pending'];
 
         foreach ($processedData as $data) {
-            $unitName = strtolower($data['Nama Unit/Poli']);
+            $unitName = $data['Nama Unit/Poli'];
             $status = $data['is_pending'] ? ($data['status'] === 'Selesai' ? 'Selesai' : 'Pending') : $data['status'];
 
-            $matched = false;
-            foreach ($this->categories as $category => $units) {
-                foreach ($units as $unit => $keywords) {
-                    if ($this->matchUnit($unitName, $keywords)) {
-                        if (!isset($unitCounts[$category][$unit])) {
-                            $unitCounts[$category][$unit] = array_fill_keys($statuses, 0);
-                        }
-                        $unitCounts[$category][$unit][$status]++;
-                        $matched = true;
-                        break 2;
-                    }
-                }
-            }
+            $category = $this->getCategoryForUnit($unitName);
 
-            if (!$matched) {
-                if (!isset($unitCounts['Lainnya']['Lainnya'])) {
-                    $unitCounts['Lainnya']['Lainnya'] = array_fill_keys($statuses, 0);
-                }
-                $unitCounts['Lainnya']['Lainnya'][$status]++;
+            if (!isset($unitCounts[$category][$unitName])) {
+                $unitCounts[$category][$unitName] = array_fill_keys($statuses, 0);
             }
+            $unitCounts[$category][$unitName][$status]++;
         }
 
         return $unitCounts;
+    }
+
+    private function getCategoryForUnit($unitName)
+    {
+        foreach ($this->categories as $category => $units) {
+            if (array_key_exists($unitName, $units)) {
+                return $category;
+            }
+        }
+        return 'Lainnya';
     }
 
     private function matchUnit($unitName, $keywords)

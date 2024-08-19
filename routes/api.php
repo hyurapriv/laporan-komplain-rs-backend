@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\DataController;
+use App\Http\Controllers\NewDataController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -13,4 +14,5 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 Route::middleware('throttle:2000,1')->group(function () {
     Route::get('/komplain-data', [DataController::class, 'getKomplainData']);
     Route::get('/available-dates', [DataController::class, 'getAvailableDates']);
+    Route::get('/new-data', [NewDataController::class, 'getComplaintData']);
 });
