@@ -5,170 +5,160 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 
 class NewDataController extends Controller
 {
-
-
-    private $petugasList = ['Ganang', 'Agus', 'Ali Muhson', 'Virgie', 'Bayu', 'Adika'];
+    private const PETUGAS_LIST = ['Ganang', 'Agus', 'Ali Muhson', 'Virgie', 'Bayu', 'Adika'];
+    private const STATUS_LIST = ['Pending', 'Dalam Pengerjaan / Pengecekan Petugas', 'Terkirim', 'Selesai'];
+    private const PETUGAS_REPLACEMENTS = [
+        'Adi' => 'Adika',
+        'Adika Wicaksana' => 'Adika',
+        'Adikaka' => 'Adika',
+        'adikaka' => 'Adika',
+        'dika' => 'Adika',
+        'Dika' => 'Adika',
+        'dikq' => 'Adika',
+        'Dikq' => 'Adika',
+        'AAdika' => 'Adika',
+        'virgie' => 'Virgie',
+        'Vi' => 'Virgie',
+        'vi' => 'Virgie',
+        'Virgie Dika' => 'Virgie, Adika',
+        'Virgie dikq' => 'Virgie, Adika'
+    ];
 
     public function getComplaintData(Request $request)
     {
         $year = $request->input('year', Carbon::now()->year);
         $month = $request->input('month', Carbon::now()->month);
 
-        $data = DB::table('form_values')
+        $data = $this->fetchComplaintData($year, $month);
+
+        $result = $this->processComplaintData($data);
+
+        return response()->json([
+            'success' => true,
+            'data' => $result + ['availableMonths' => $this->getAvailableMonths($year)],
+        ]);
+    }
+
+    private function fetchComplaintData($year, $month)
+    {
+        return DB::table('form_values')
             ->where('form_id', 3)
             ->whereYear('created_at', $year)
             ->whereMonth('created_at', $month)
             ->select('json', 'status', 'datetime_masuk', 'datetime_pengerjaan', 'datetime_selesai', 'petugas', 'is_pending')
             ->get();
+    }
 
+    private function processComplaintData(Collection $data)
+    {
         $units = [];
-        $petugasCounts = array_fill_keys($this->petugasList, 0);
+        $petugasCounts = array_fill_keys(self::PETUGAS_LIST, 0);
         $petugasCounts['Lainnya'] = 0;
-
-        $totalStatus = [
-            'Pending' => 0,
-            'Dalam Pengerjaan / Pengecekan Petugas' => 0,
-            'Terkirim' => 0,
-            'Selesai' => 0,
-        ];
+        $totalStatus = array_fill_keys(self::STATUS_LIST, 0);
+        $totalResponTime = 0;
+        $totalResponCount = 0;
 
         foreach ($data as $item) {
             $jsonData = json_decode($item->json, true)[0] ?? [];
 
-            $namaPelapor = $this->getValueFromJson($jsonData, 'text-1709615631557-0');
-            if ($namaPelapor === 'tes') {
+            if ($this->getValueFromJson($jsonData, 'text-1709615631557-0') === 'tes') {
                 continue;
             }
 
-            $status = $this->getValueFromJson($jsonData, 'Status');
-            $isPending = $item->is_pending;
+            $status = $this->getFinalStatus($item);
+            $unitValue = $this->getUnitValue($jsonData);
 
-            $finalStatus = $isPending == 1 && ($status === 'Dalam Pengerjaan / Pengecekan Petugas' || $status === 'Terkirim') ? 'Pending' : $status;
+            $this->updateUnitStats($units, $unitValue, $status, $item);
+            $this->updatePetugasCounts($petugasCounts, $item->petugas);
+            $totalStatus[$status]++;
 
-            $unitData = collect($jsonData)->firstWhere('name', 'select-1722845859503-0');
-            $unitValue = $unitData ? collect($unitData['values'])->firstWhere('selected', 1)['label'] : 'Tidak Ditentukan';
-
-            if (!isset($units[$unitValue])) {
-                $units[$unitValue] = [
-                    'Pending' => 0,
-                    'Dalam Pengerjaan / Pengecekan Petugas' => 0,
-                    'Terkirim' => 0,
-                    'Selesai' => 0,
-                    'Total' => 0,
-                    'totalResponTime' => 0,
-                    'responTimes' => []
-                ];
-            }
-            $units[$unitValue][$finalStatus]++;
-            $units[$unitValue]['Total']++;
-
-            $totalStatus[$finalStatus]++;
-
-            $petugasList = array_unique(explode(', ', $this->normalizePetugasNames($item->petugas)));
-            foreach ($petugasList as $petugas) {
-                if (in_array($petugas, $this->petugasList)) {
-                    $petugasCounts[$petugas]++;
-                } elseif (!empty($petugas)) {
-                    $petugasCounts['Lainnya']++;
-                }
-            }
-
-            $datetimeMasuk = Carbon::parse($item->datetime_masuk);
-            $datetimeSelesai = $isPending ? Carbon::now() : Carbon::parse($item->datetime_selesai);
-
-            if ($finalStatus !== 'Pending') {
-                $responTime = $datetimeSelesai->diffInMinutes($datetimeMasuk);
-
-                $units[$unitValue]['totalResponTime'] += $responTime;
-                $units[$unitValue]['responTimes'][] = $responTime;
+            if ($status !== 'Pending') {
+                $responTime = $this->calculateResponTime($item);
+                $totalResponTime += $responTime;
+                $totalResponCount++;
             }
         }
+
+        $this->calculateAverageResponTimes($units);
+        $overallAverageResponTime = $totalResponCount > 0 ? $this->formatResponTime($totalResponTime / $totalResponCount) : null;
 
         if ($petugasCounts['Lainnya'] === 0) {
             unset($petugasCounts['Lainnya']);
         }
 
-        $totalAverageResponTime = 0;
-        $unitCount = 0;
+        return compact('units', 'totalStatus', 'petugasCounts', 'overallAverageResponTime');
+    }
 
-        foreach ($units as $unit => $data) {
-            if (count($data['responTimes']) > 0) {
-                $averageResponTime = $data['totalResponTime'] / count($data['responTimes']);
-                $units[$unit]['averageResponTime'] = $this->formatResponTime($averageResponTime);
+    private function getFinalStatus($item)
+    {
+        $status = $this->getValueFromJson(json_decode($item->json, true)[0] ?? [], 'Status');
+        return $item->is_pending == 1 && in_array($status, ['Dalam Pengerjaan / Pengecekan Petugas', 'Terkirim'])
+            ? 'Pending'
+            : $status;
+    }
 
-                $totalAverageResponTime += $averageResponTime;
-                $unitCount++;
-            } else {
-                $units[$unit]['averageResponTime'] = null;
-            }
-            unset($units[$unit]['responTimes']);
+    private function getUnitValue($jsonData)
+    {
+        $unitData = collect($jsonData)->firstWhere('name', 'select-1722845859503-0');
+        return $unitData ? collect($unitData['values'])->firstWhere('selected', 1)['label'] : 'Tidak Ditentukan';
+    }
+
+    private function updateUnitStats(&$units, $unitValue, $status, $item)
+    {
+        if (!isset($units[$unitValue])) {
+            $units[$unitValue] = array_fill_keys(self::STATUS_LIST, 0) + ['Total' => 0, 'totalResponTime' => 0, 'responCount' => 0];
         }
+        $units[$unitValue][$status]++;
+        $units[$unitValue]['Total']++;
 
-        // Rata-rata dari semua rata-rata unit
-        $overallAverageResponTime = $unitCount > 0 ? $this->formatResponTime($totalAverageResponTime / $unitCount) : null;
+        if ($status !== 'Pending') {
+            $responTime = $this->calculateResponTime($item);
+            $units[$unitValue]['totalResponTime'] += $responTime;
+            $units[$unitValue]['responCount']++;
+        }
+    }
 
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'units' => $units,
-                'totalStatus' => $totalStatus,
-                'petugasCounts' => $petugasCounts,
-                'overallAverageResponTime' => $overallAverageResponTime,
-                'availableMonths' => $this->getAvailableMonths($year),
-            ],
-        ]);
+    private function updatePetugasCounts(&$petugasCounts, $petugas)
+    {
+        $petugasList = array_unique(explode(', ', $this->normalizePetugasNames($petugas)));
+        foreach ($petugasList as $petugas) {
+            if (in_array($petugas, self::PETUGAS_LIST)) {
+                $petugasCounts[$petugas]++;
+            } elseif (!empty($petugas)) {
+                $petugasCounts['Lainnya']++;
+            }
+        }
+    }
+
+    private function calculateResponTime($item)
+    {
+        $datetimeMasuk = Carbon::parse($item->datetime_masuk);
+        $datetimeSelesai = $item->is_pending ? Carbon::now() : Carbon::parse($item->datetime_selesai);
+        return $datetimeSelesai->diffInMinutes($datetimeMasuk);
+    }
+
+    private function calculateAverageResponTimes(&$units)
+    {
+        foreach ($units as &$data) {
+            if ($data['responCount'] > 0) {
+                $data['averageResponTime'] = $this->formatResponTime($data['totalResponTime'] / $data['responCount']);
+            } else {
+                $data['averageResponTime'] = null;
+            }
+            unset($data['totalResponTime'], $data['responCount']);
+        }
     }
 
     private function formatResponTime($minutes)
     {
-        if ($minutes >= 60) {
-            $hours = floor($minutes / 60);
-            $remainingMinutes = $minutes % 60;
-            return $remainingMinutes > 0 ? "{$hours}h {$remainingMinutes}m" : "{$hours}h";
-        }
-        return "{$minutes}m";
-    }
-
-    public function selectComplaint(Request $request)
-    {
-        $year = $request->input('year', Carbon::now()->year);
-        $month = $request->input('month', Carbon::now()->month);
-
-        $data = DB::table('form_values')
-            ->where('form_id', 3)
-            ->whereYear('created_at', $year)
-            ->whereMonth('created_at', $month)
-            ->select('id', 'json', 'status', 'datetime_masuk', 'datetime_pengerjaan', 'datetime_selesai', 'petugas', 'is_pending')
-            ->get();
-
-        $processedData = $data->map(function ($item) {
-            $jsonData = json_decode($item->json, true)[0] ?? [];
-
-            $unitData = collect($jsonData)->firstWhere('name', 'select-1722845859503-0');
-            $unitValue = $unitData ? collect($unitData['values'])->firstWhere('selected', 1)['label'] : null;
-
-            $statusData = $this->getValueFromJson($jsonData, 'Status');
-
-            return [
-                'id' => $item->id,
-                'nama_pelapor' => $this->getValueFromJson($jsonData, 'text-1709615631557-0'),
-                'unit' => $unitValue,
-                'status' => $statusData,
-                'datetime_masuk' => $item->datetime_masuk,
-                'datetime_pengerjaan' => $item->datetime_pengerjaan,
-                'datetime_selesai' => $item->datetime_selesai,
-                'petugas' => $this->normalizePetugasNames($item->petugas),
-                'is_pending' => $item->is_pending,
-            ];
-        });
-
-        return view('index', [
-            'processedData' => $processedData,
-            'petugasCounts' => $this->getPetugasCounts($processedData),
-        ]);
+        $hours = floor($minutes / 60);
+        $remainingMinutes = $minutes % 60;
+        return $hours > 0 ? ($remainingMinutes > 0 ? "{$hours}h {$remainingMinutes}m" : "{$hours}h") : "{$minutes}m";
     }
 
     private function getValueFromJson($jsonData, $key)
@@ -179,75 +169,50 @@ class NewDataController extends Controller
 
     private function normalizePetugasNames($petugas)
     {
-        if (empty($petugas)) {
-            return null;
-        }
-
-        $replacements = [
-            'Adi' => 'Adika',
-            'Adika Wicaksana' => 'Adika',
-            'Adikaka' => 'Adika',
-            'adikaka' => 'Adika',
-            'dika' => 'Adika',
-            'Dika' => 'Adika',
-            'dikq' => 'Adika',
-            'Dikq' => 'Adika',
-            'AAdika' => 'Adika',
-            'virgie' => 'Virgie',
-            'Vi' => 'Virgie',
-            'vi' => 'Virgie',
-            'Virgie Dika' => 'Virgie, Adika',
-            'Virgie dikq' => 'Virgie, Adika',
-        ];
+        if (empty($petugas)) return null;
 
         $petugasList = preg_split('/\s*[,&]\s*|\s+dan\s+/i', $petugas);
-        $normalizedList = array_map(function ($name) use ($replacements) {
-            $normalizedName = $replacements[trim($name)] ?? trim($name);
-            return in_array($normalizedName, $this->petugasList) ? $normalizedName : 'Lainnya';
+        $normalizedList = array_map(function ($name) {
+            $normalizedName = self::PETUGAS_REPLACEMENTS[trim($name)] ?? trim($name);
+            return in_array($normalizedName, self::PETUGAS_LIST) ? $normalizedName : 'Lainnya';
         }, $petugasList);
 
         return implode(', ', array_unique($normalizedList));
     }
 
-    private function getPetugasCounts($processedData)
+    private function getAvailableMonths()
     {
-        $petugasCounts = array_fill_keys($this->petugasList, 0);
-        $petugasCounts['Lainnya'] = 0;
+        $previousYear = Carbon::now()->subYear()->year;
 
-        foreach ($processedData as $data) {
-            $petugasList = array_unique(explode(', ', $data['petugas']));
-            foreach ($petugasList as $petugas) {
-                if (in_array($petugas, $this->petugasList)) {
-                    $petugasCounts[$petugas]++;
-                } elseif (!empty($petugas)) {
-                    $petugasCounts['Lainnya']++;
-                }
-            }
-        }
-
-        if ($petugasCounts['Lainnya'] === 0) {
-            unset($petugasCounts['Lainnya']);
-        }
-
-        return $petugasCounts;
-    }
-
-    private function getAvailableMonths($year)
-    {
-        $availableMonths = [];
-
-        $months = DB::table('form_values')
+        // Ambil data dari tahun lalu
+        $availableMonths = DB::table('form_values')
             ->where('form_id', 3)
-            ->whereYear('created_at', $year)
-            ->selectRaw('MONTH(created_at) as month, COUNT(id) as count')
+            ->whereYear('created_at', $previousYear)
+            ->selectRaw('MONTH(created_at) as month')
             ->groupBy('month')
             ->havingRaw('SUM(json REGEXP "select-1722845859503-0") > 0')
-            ->get();
+            ->pluck('month')
+            ->map(fn($month) => Carbon::create($previousYear, $month)->format('Y-m'))
+            ->toArray();
 
-        foreach ($months as $month) {
-            if ($month->count > 0) {
-                $availableMonths[] = Carbon::create($year, $month->month)->format('F');
-            }
+        // Log untuk debugging
+        Log::info('Available Months for Previous Year:', $availableMonths);
+
+        // Jika tidak ada data, fallback ke tahun ini
+        if (empty($availableMonths)) {
+            $currentYear = Carbon::now()->year;
+            $availableMonths = DB::table('form_values')
+                ->where('form_id', 3)
+                ->whereYear('created_at', $currentYear)
+                ->selectRaw('MONTH(created_at) as month')
+                ->groupBy('month')
+                ->havingRaw('SUM(json REGEXP "select-1722845859503-0") > 0')
+                ->pluck('month')
+                ->map(fn($month) => Carbon::create($currentYear, $month)->format('Y-m'))
+                ->toArray();
+
+            // Log untuk debugging
+            Log::info('Available Months for Current Year:', $availableMonths);
         }
 
         return $availableMonths;
