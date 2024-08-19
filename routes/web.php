@@ -29,6 +29,6 @@ Route::get('/data', [DataController::class, 'index'])->name('data.index');
 Route::get('/data/download', [DataController::class, 'download'])->name('data.download');
 Route::get('/data/komplain', [DataController::class, 'getKomplainData'])->name('data.komplain');
 Route::get('/data/view', [DataController::class, 'renderView'])->name('data.renderView');
-Route::get('/new-data', [NewDataController::class, 'getComplaintData'])->name('newdata');
+Route::get('/new-data', [NewDataController::class, 'selectComplaint'])->name('newdata');
 
 
