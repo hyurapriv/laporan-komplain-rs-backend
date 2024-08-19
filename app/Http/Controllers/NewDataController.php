@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
@@ -8,9 +7,11 @@ use Carbon\Carbon;
 
 class NewDataController extends Controller
 {
+
+
     private $petugasList = ['Ganang', 'Agus', 'Ali Muhson', 'Virgie', 'Bayu', 'Adika'];
 
-    public function getComplaintData(Request $request)
+   public function getComplaintData(Request $request)
     {
         $year = $request->input('year', Carbon::now()->year);
         $month = $request->input('month', Carbon::now()->month);
@@ -26,7 +27,6 @@ class NewDataController extends Controller
         $petugasCounts = array_fill_keys($this->petugasList, 0);
         $petugasCounts['Lainnya'] = 0;
 
-        // Inisialisasi total status
         $totalStatus = [
             'Pending' => 0,
             'Dalam Pengerjaan / Pengecekan Petugas' => 0,
@@ -35,25 +35,18 @@ class NewDataController extends Controller
         ];
 
         foreach ($data as $item) {
-            $jsonData = json_decode($item->json, true)[0] ?? []; // Menangani kemungkinan null
+            $jsonData = json_decode($item->json, true)[0] ?? [];
 
-            // Mengecualikan data jika nama pembuat laporannya adalah "tes"
             $namaPelapor = $this->getValueFromJson($jsonData, 'text-1709615631557-0');
             if ($namaPelapor === 'tes') {
                 continue;
             }
 
-            // Menghitung Status Akhir
             $status = $this->getValueFromJson($jsonData, 'Status');
             $isPending = $item->is_pending;
 
-            if ($isPending == 1 && ($status === 'Dalam Pengerjaan / Pengecekan Petugas' || $status === 'Terkirim')) {
-                $finalStatus = 'Pending';
-            } else {
-                $finalStatus = $status;
-            }
+            $finalStatus = $isPending == 1 && ($status === 'Dalam Pengerjaan / Pengecekan Petugas' || $status === 'Terkirim') ? 'Pending' : $status;
 
-            // Menghitung Statistik Unit
             $unitData = collect($jsonData)->firstWhere('name', 'select-1722845859503-0');
             $unitValue = $unitData ? collect($unitData['values'])->firstWhere('selected', 1)['label'] : 'Tidak Ditentukan';
 
@@ -64,17 +57,15 @@ class NewDataController extends Controller
                     'Terkirim' => 0,
                     'Selesai' => 0,
                     'Total' => 0,
-                    'totalResponTime' => 0,  // Total ResponTime per unit
-                    'responTimes' => []       // Array to store each responTime
+                    'totalResponTime' => 0,
+                    'responTimes' => []
                 ];
             }
             $units[$unitValue][$finalStatus]++;
             $units[$unitValue]['Total']++;
 
-            // Menghitung Statistik Total
             $totalStatus[$finalStatus]++;
 
-            // Menghitung Statistik Petugas
             $petugasList = array_unique(explode(', ', $this->normalizePetugasNames($item->petugas)));
             foreach ($petugasList as $petugas) {
                 if (in_array($petugas, $this->petugasList)) {
@@ -84,12 +75,10 @@ class NewDataController extends Controller
                 }
             }
 
-            // Menghitung ResponTime
             $datetimePengerjaan = Carbon::parse($item->datetime_pengerjaan);
             $datetimeSelesai = $isPending ? Carbon::now() : Carbon::parse($item->datetime_selesai);
 
             if ($finalStatus !== 'Pending') {
-                // Hitung responTime hanya jika statusnya Selesai
                 $responTime = $datetimeSelesai->diffInMinutes($datetimePengerjaan);
 
                 $units[$unitValue]['totalResponTime'] += $responTime;
@@ -97,21 +86,28 @@ class NewDataController extends Controller
             }
         }
 
-        // Hapus kategori 'Lainnya' jika tidak ada data yang cocok
         if ($petugasCounts['Lainnya'] === 0) {
             unset($petugasCounts['Lainnya']);
         }
 
-        // Hitung rata-rata responTime per unit dan format
+        $totalAverageResponTime = 0;
+        $unitCount = 0;
+
         foreach ($units as $unit => $data) {
             if (count($data['responTimes']) > 0) {
                 $averageResponTime = $data['totalResponTime'] / count($data['responTimes']);
                 $units[$unit]['averageResponTime'] = $this->formatResponTime($averageResponTime);
+
+                $totalAverageResponTime += $averageResponTime;
+                $unitCount++;
             } else {
-                $units[$unit]['averageResponTime'] = null; // Tidak ada data responTime
+                $units[$unit]['averageResponTime'] = null;
             }
-            unset($units[$unit]['responTimes']); // Remove the array of responTimes
+            unset($units[$unit]['responTimes']);
         }
+
+        // Rata-rata dari semua rata-rata unit
+        $overallAverageResponTime = $unitCount > 0 ? $this->formatResponTime($totalAverageResponTime / $unitCount) : null;
 
         return response()->json([
             'success' => true,
@@ -119,10 +115,10 @@ class NewDataController extends Controller
                 'units' => $units,
                 'totalStatus' => $totalStatus,
                 'petugasCounts' => $petugasCounts,
+                'overallAverageResponTime' => $overallAverageResponTime,
             ],
         ]);
     }
-
 
     private function formatResponTime($minutes)
     {
@@ -147,7 +143,7 @@ class NewDataController extends Controller
             ->get();
 
         $processedData = $data->map(function ($item) {
-            $jsonData = json_decode($item->json, true)[0] ?? []; // Menangani kemungkinan null
+            $jsonData = json_decode($item->json, true)[0] ?? [];
 
             $unitData = collect($jsonData)->firstWhere('name', 'select-1722845859503-0');
             $unitValue = $unitData ? collect($unitData['values'])->firstWhere('selected', 1)['label'] : null;
@@ -173,7 +169,6 @@ class NewDataController extends Controller
         ]);
     }
 
-
     private function getValueFromJson($jsonData, $key)
     {
         $item = collect($jsonData)->firstWhere('name', $key);
@@ -183,7 +178,7 @@ class NewDataController extends Controller
     private function normalizePetugasNames($petugas)
     {
         if (empty($petugas)) {
-            return null; // Menangani kasus null atau kosong
+            return null;
         }
 
         $replacements = [
@@ -218,10 +213,6 @@ class NewDataController extends Controller
         $petugasCounts['Lainnya'] = 0;
 
         foreach ($processedData as $data) {
-            if (empty($data['petugas'])) {
-                continue; // Abaikan data dengan petugas null atau kosong
-            }
-
             $petugasList = array_unique(explode(', ', $data['petugas']));
             foreach ($petugasList as $petugas) {
                 if (in_array($petugas, $this->petugasList)) {
@@ -232,11 +223,10 @@ class NewDataController extends Controller
             }
         }
 
-        // Hapus kategori 'Lainnya' jika tidak ada data yang cocok
         if ($petugasCounts['Lainnya'] === 0) {
             unset($petugasCounts['Lainnya']);
         }
 
-        return array_filter($petugasCounts);
+        return $petugasCounts;
     }
 }
