@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
@@ -11,7 +12,7 @@ class NewDataController extends Controller
 
     private $petugasList = ['Ganang', 'Agus', 'Ali Muhson', 'Virgie', 'Bayu', 'Adika'];
 
-   public function getComplaintData(Request $request)
+    public function getComplaintData(Request $request)
     {
         $year = $request->input('year', Carbon::now()->year);
         $month = $request->input('month', Carbon::now()->month);
@@ -75,11 +76,11 @@ class NewDataController extends Controller
                 }
             }
 
-            $datetimePengerjaan = Carbon::parse($item->datetime_pengerjaan);
+            $datetimeMasuk = Carbon::parse($item->datetime_masuk);
             $datetimeSelesai = $isPending ? Carbon::now() : Carbon::parse($item->datetime_selesai);
 
             if ($finalStatus !== 'Pending') {
-                $responTime = $datetimeSelesai->diffInMinutes($datetimePengerjaan);
+                $responTime = $datetimeSelesai->diffInMinutes($datetimeMasuk);
 
                 $units[$unitValue]['totalResponTime'] += $responTime;
                 $units[$unitValue]['responTimes'][] = $responTime;
@@ -116,6 +117,7 @@ class NewDataController extends Controller
                 'totalStatus' => $totalStatus,
                 'petugasCounts' => $petugasCounts,
                 'overallAverageResponTime' => $overallAverageResponTime,
+                'availableMonths' => $this->getAvailableMonths($year),
             ],
         ]);
     }
@@ -228,5 +230,26 @@ class NewDataController extends Controller
         }
 
         return $petugasCounts;
+    }
+
+    private function getAvailableMonths($year)
+    {
+        $availableMonths = [];
+
+        $months = DB::table('form_values')
+            ->where('form_id', 3)
+            ->whereYear('created_at', $year)
+            ->selectRaw('MONTH(created_at) as month, COUNT(id) as count')
+            ->groupBy('month')
+            ->havingRaw('SUM(json REGEXP "select-1722845859503-0") > 0')
+            ->get();
+
+        foreach ($months as $month) {
+            if ($month->count > 0) {
+                $availableMonths[] = Carbon::create($year, $month->month)->format('F');
+            }
+        }
+
+        return $availableMonths;
     }
 }
