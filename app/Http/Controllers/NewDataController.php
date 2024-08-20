@@ -26,7 +26,7 @@ class NewDataController extends Controller
         'Vi' => 'Virgie',
         'vi' => 'Virgie',
         'Virgie Dika' => 'Virgie, Adika',
-        'Virgie dikq' => 'Virgie, Adika'
+        'Virgie dikq' => 'Virgie, Adika',
     ];
 
     private const UNIT_CATEGORIES = [
@@ -121,7 +121,7 @@ class NewDataController extends Controller
             }
 
             $jsonData = json_decode($item->json, true)[0] ?? [];
-            
+
             $reporterName = $this->getValueFromJson($jsonData, 'Nama (Yang Membuat Laporan)');
             Log::info("Nama Pelapor: " . $reporterName);
             if (strtolower(trim($reporterName)) === 'tes') {
@@ -136,6 +136,12 @@ class NewDataController extends Controller
             }
 
             $status = $this->getFinalStatus($item);
+
+            // Memeriksa apakah ada petugas dalam kategori "Lainnya"
+            $normalizedPetugas = $this->normalizePetugasNames($item->petugas);
+            if (strpos($normalizedPetugas, 'Lainnya') !== false) {
+                continue;  // Jika ada petugas yang termasuk "Lainnya", skip entri ini
+            }
 
             $this->updateCategoryStats($categories[$category], $unitValue, $status, $item);
             $this->updateCategoryTotals($categoryTotals[$category], $status);
@@ -159,6 +165,7 @@ class NewDataController extends Controller
 
         return compact('categories', 'categoryTotals', 'totalStatus', 'petugasCounts', 'overallAverageResponTime', 'totalComplaints');
     }
+
 
     private function updateCategoryStats(&$category, $unitValue, $status, $item)
     {
@@ -220,8 +227,6 @@ class NewDataController extends Controller
         foreach ($petugasList as $petugas) {
             if (in_array($petugas, self::PETUGAS_LIST)) {
                 $petugasCounts[$petugas]++;
-            } elseif (!empty($petugas)) {
-                $petugasCounts['Lainnya']++;
             }
         }
     }
@@ -264,14 +269,34 @@ class NewDataController extends Controller
     {
         if (empty($petugas)) return null;
 
+        // Memecah string petugas berdasarkan koma, ampersand, atau "dan"
         $petugasList = preg_split('/\s*[,&]\s*|\s+dan\s+/i', $petugas);
+
         $normalizedList = array_map(function ($name) {
-            $normalizedName = self::PETUGAS_REPLACEMENTS[trim($name)] ?? trim($name);
-            return in_array($normalizedName, self::PETUGAS_LIST) ? $normalizedName : 'Lainnya';
+            // Trim dan ubah nama menjadi huruf kecil untuk pencocokan
+            $normalizedName = strtolower(trim($name));
+
+            // Memeriksa apakah ada penggantian nama dalam daftar penggantian, dengan case-insensitive
+            $finalName = null;
+            foreach (self::PETUGAS_REPLACEMENTS as $key => $replacement) {
+                if (strtolower(trim($key)) === $normalizedName) {
+                    $finalName = $replacement;
+                    break;
+                }
+            }
+
+            // Jika tidak ada penggantian yang ditemukan, gunakan nama asli (title case)
+            if (!$finalName) {
+                $finalName = ucwords($normalizedName);
+            }
+
+            // Mengembalikan nama yang sesuai dengan daftar petugas atau 'Lainnya'
+            return in_array($finalName, self::PETUGAS_LIST) ? $finalName : 'Lainnya';
         }, $petugasList);
 
         return implode(', ', array_unique($normalizedList));
     }
+
 
     private function getAvailableMonths($data)
     {
@@ -314,17 +339,17 @@ class NewDataController extends Controller
         $formattedData = $data->map(function ($item) {
             // Decode JSON
             $jsonData = json_decode($item->json, true);
-        
+
             // Check if JSON data is valid
             if (is_array($jsonData) && count($jsonData) > 0) {
                 // Flatten JSON structure to get values
                 $dataArray = $jsonData[0];
-        
+
                 // Extract relevant information
                 $nama_pelapor = '';
                 $unit = '';
                 $status = '';
-        
+
                 foreach ($dataArray as $data) {
                     if ($data['type'] == 'text' && $data['label'] == 'Nama (Yang Membuat Laporan)') {
                         $nama_pelapor = $data['value'];
@@ -343,7 +368,7 @@ class NewDataController extends Controller
             } else {
                 $nama_pelapor = $unit = $status = 'N/A';
             }
-        
+
             return [
                 'id' => $item->id ?? 'N/A',
                 'nama_pelapor' => $nama_pelapor,
@@ -358,8 +383,8 @@ class NewDataController extends Controller
         });
 
         return view('index', [
-            'formattedData' => $formattedData, 
-            'year' => $year, 
+            'formattedData' => $formattedData,
+            'year' => $year,
             'month' => $month,
             'categoryTotals' => $processedData['categoryTotals'],
             'totalStatus' => $processedData['totalStatus'],
