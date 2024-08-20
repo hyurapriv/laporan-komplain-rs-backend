@@ -29,6 +29,40 @@ class NewDataController extends Controller
         'Virgie dikq' => 'Virgie, Adika'
     ];
 
+    private const UNIT_CATEGORIES = [
+        'Kategori IGD' => ['Ambulance', 'IGD'],
+        'Kategori Rawat Jalan' => [
+            'Klinik Anak',
+            'Klinik Bedah',
+            'Klinik Gigi',
+            'Klinik Jantung',
+            'Klinik Konservasi',
+            'Klinik Kulit',
+            'Klinik Kusta',
+            'Klinik Mata',
+            'Klinik Obgyn',
+            'Klinik Ortopedy',
+            'Klinik Penyakit Dalam',
+            'Klinik TB',
+            'Klinik THT',
+            'Klinik Umum'
+        ],
+        'Kategori Rawat Inap' => [
+            'Irna Atas',
+            'Irna Bawah',
+            'IBS',
+            'VK',
+            'Perinatology'
+        ],
+        'Kategori Penunjang Medis' => [
+            'Farmasi',
+            'Laboratorium',
+            'Admisi / Rekam Medis',
+            'Rehab Medik'
+        ],
+        'Kategori Lainnya' => ['Lainnya']
+    ];
+
     public function getComplaintData(Request $request)
     {
         $year = $request->input('year', Carbon::now()->year);
@@ -57,63 +91,95 @@ class NewDataController extends Controller
             ->get();
     }
 
+    private function getUnitCategory($unitValue)
+    {
+        foreach (self::UNIT_CATEGORIES as $category => $units) {
+            if (in_array($unitValue, $units)) {
+                return $category;
+            }
+        }
+        return 'Kategori Lainnya';
+    }
+
     private function processComplaintData(Collection $data)
-{
-    $units = [];
-    $petugasCounts = array_fill_keys(self::PETUGAS_LIST, 0);
-    $petugasCounts['Lainnya'] = 0;
-    $totalStatus = array_fill_keys(self::STATUS_LIST, 0);
-    $totalResponTime = 0;
-    $totalResponCount = 0;
-    $totalComplaints = 0;
+    {
+        $categories = array_fill_keys(array_keys(self::UNIT_CATEGORIES), []);
+        $categoryTotals = array_fill_keys(array_keys(self::UNIT_CATEGORIES), [
+            'Total' => 0,
+            'Status' => array_fill_keys(self::STATUS_LIST, 0)
+        ]);
+        $petugasCounts = array_fill_keys(self::PETUGAS_LIST, 0);
+        $petugasCounts['Lainnya'] = 0;
+        $totalStatus = array_fill_keys(self::STATUS_LIST, 0);
+        $totalResponTime = 0;
+        $totalResponCount = 0;
+        $totalComplaints = 0;
 
-    foreach ($data as $item) {
-        // Mengecualikan data dengan ID tertentu
-        if ($item->id == 1404) {
-            continue;
+        foreach ($data as $item) {
+            if ($item->id == 1404) {
+                continue;
+            }
+
+            $jsonData = json_decode($item->json, true)[0] ?? [];
+            
+            $reporterName = $this->getValueFromJson($jsonData, 'Nama (Yang Membuat Laporan)');
+            Log::info("Nama Pelapor: " . $reporterName);
+            if (strtolower(trim($reporterName)) === 'tes') {
+                continue;
+            }
+
+            $unitValue = $this->getUnitValue($jsonData);
+            $category = $this->getUnitCategory($unitValue);
+
+            if ($category === 'Kategori Lainnya' && $unitValue !== 'Lainnya') {
+                continue;
+            }
+
+            $status = $this->getFinalStatus($item);
+
+            $this->updateCategoryStats($categories[$category], $unitValue, $status, $item);
+            $this->updateCategoryTotals($categoryTotals[$category], $status);
+            $this->updatePetugasCounts($petugasCounts, $item->petugas);
+            $totalStatus[$status]++;
+            $totalComplaints++;
+
+            if ($status !== 'Pending') {
+                $responTime = $this->calculateResponTime($item);
+                $totalResponTime += $responTime;
+                $totalResponCount++;
+            }
         }
 
-        // Decode JSON data
-        $jsonData = json_decode($item->json, true)[0] ?? [];
-        
-        // Check if the reporter's name is "tes"
-        $reporterName = $this->getValueFromJson($jsonData, 'Nama (Yang Membuat Laporan)');
-        Log::info("Nama Pelapor: " . $reporterName);  // Tambahkan log untuk debugging
-        if (strtolower(trim($reporterName)) === 'tes') {
-            continue; // Skip this entry
+        $this->calculateAverageResponTimes($categories);
+        $overallAverageResponTime = $totalResponCount > 0 ? $this->formatResponTime($totalResponTime / $totalResponCount) : null;
+
+        if ($petugasCounts['Lainnya'] === 0) {
+            unset($petugasCounts['Lainnya']);
         }
 
-        $unitValue = $this->getUnitValue($jsonData);
+        return compact('categories', 'categoryTotals', 'totalStatus', 'petugasCounts', 'overallAverageResponTime', 'totalComplaints');
+    }
 
-        if ($unitValue === 'Tidak Ditentukan' || $unitValue === null) {
-            continue;
+    private function updateCategoryStats(&$category, $unitValue, $status, $item)
+    {
+        if (!isset($category[$unitValue])) {
+            $category[$unitValue] = array_fill_keys(self::STATUS_LIST, 0) + ['Total' => 0, 'totalResponTime' => 0, 'responCount' => 0];
         }
-
-        $status = $this->getFinalStatus($item);
-
-        $this->updateUnitStats($units, $unitValue, $status, $item);
-        $this->updatePetugasCounts($petugasCounts, $item->petugas);
-        $totalStatus[$status]++;
-        $totalComplaints++;
+        $category[$unitValue][$status]++;
+        $category[$unitValue]['Total']++;
 
         if ($status !== 'Pending') {
             $responTime = $this->calculateResponTime($item);
-            $totalResponTime += $responTime;
-            $totalResponCount++;
+            $category[$unitValue]['totalResponTime'] += $responTime;
+            $category[$unitValue]['responCount']++;
         }
     }
 
-    $this->calculateAverageResponTimes($units);
-    $overallAverageResponTime = $totalResponCount > 0 ? $this->formatResponTime($totalResponTime / $totalResponCount) : null;
-
-    if ($petugasCounts['Lainnya'] === 0) {
-        unset($petugasCounts['Lainnya']);
+    private function updateCategoryTotals(&$categoryTotal, $status)
+    {
+        $categoryTotal['Total']++;
+        $categoryTotal['Status'][$status]++;
     }
-
-    return compact('units', 'totalStatus', 'petugasCounts', 'overallAverageResponTime', 'totalComplaints');
-}
-
-
 
     private function getFinalStatus($item)
     {
@@ -167,15 +233,17 @@ class NewDataController extends Controller
         return $datetimeSelesai->diffInMinutes($datetimeMasuk);
     }
 
-    private function calculateAverageResponTimes(&$units)
+    private function calculateAverageResponTimes(&$categories)
     {
-        foreach ($units as &$data) {
-            if ($data['responCount'] > 0) {
-                $data['averageResponTime'] = $this->formatResponTime($data['totalResponTime'] / $data['responCount']);
-            } else {
-                $data['averageResponTime'] = null;
+        foreach ($categories as &$category) {
+            foreach ($category as &$data) {
+                if ($data['responCount'] > 0) {
+                    $data['averageResponTime'] = $this->formatResponTime($data['totalResponTime'] / $data['responCount']);
+                } else {
+                    $data['averageResponTime'] = null;
+                }
+                unset($data['totalResponTime'], $data['responCount']);
             }
-            unset($data['totalResponTime'], $data['responCount']);
         }
     }
 
@@ -241,20 +309,22 @@ class NewDataController extends Controller
             return view('index', ['error' => 'Data tidak ditemukan']);
         }
 
+        $processedData = $this->processComplaintData($data);
+
         $formattedData = $data->map(function ($item) {
             // Decode JSON
             $jsonData = json_decode($item->json, true);
-
+        
             // Check if JSON data is valid
             if (is_array($jsonData) && count($jsonData) > 0) {
                 // Flatten JSON structure to get values
                 $dataArray = $jsonData[0];
-
+        
                 // Extract relevant information
                 $nama_pelapor = '';
                 $unit = '';
                 $status = '';
-
+        
                 foreach ($dataArray as $data) {
                     if ($data['type'] == 'text' && $data['label'] == 'Nama (Yang Membuat Laporan)') {
                         $nama_pelapor = $data['value'];
@@ -273,7 +343,7 @@ class NewDataController extends Controller
             } else {
                 $nama_pelapor = $unit = $status = 'N/A';
             }
-
+        
             return [
                 'id' => $item->id ?? 'N/A',
                 'nama_pelapor' => $nama_pelapor,
@@ -287,6 +357,13 @@ class NewDataController extends Controller
             ];
         });
 
-        return view('index', ['formattedData' => $formattedData, 'year' => $year, 'month' => $month]);
+        return view('index', [
+            'formattedData' => $formattedData, 
+            'year' => $year, 
+            'month' => $month,
+            'categoryTotals' => $processedData['categoryTotals'],
+            'totalStatus' => $processedData['totalStatus'],
+            'totalComplaints' => $processedData['totalComplaints']
+        ]);
     }
 }
