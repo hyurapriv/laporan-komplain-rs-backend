@@ -3,36 +3,57 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Daftar Komplain</title>
-    <link href="{{ asset('css/app.css') }}" rel="stylesheet">
+    <title>Complaint Data Detail</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.28.0/themes/prism-tomorrow.min.css">
     <style>
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        pre {
+        body {
+            font-family: Arial, sans-serif;
             background-color: #f4f4f4;
             padding: 20px;
-            border-radius: 4px;
-            overflow: auto;
         }
+
+        .data-container {
+            margin-bottom: 20px;
+        }
+
+        .data-item {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .data-item p {
+            margin: 5px 0;
+        }
+
         h1, h2 {
-            margin: 20px 0;
-            font-size: 24px;
+            margin-bottom: 20px;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Daftar Komplain</h1>
 
-        <!-- Tampilkan Daftar Komplain dalam Format JSON -->
-        <h2>Data Komplain</h2>
-        <pre>{{ json_encode($processedData, JSON_PRETTY_PRINT) }}</pre>
+    <h1 class="text-2xl font-bold mb-4">Complaint Data Details</h1>
 
-        <!-- Tampilkan Statistik Petugas dalam Format JSON -->
-        <h2>Statistik Petugas</h2>
-        <pre>{{ json_encode($petugasCounts, JSON_PRETTY_PRINT) }}</pre>
-    </div>
+    @if(isset($formattedData) && count($formattedData) > 0)
+        @foreach ($formattedData as $item)
+            <div class="data-item">
+                <p><strong>ID:</strong> {{ $item['id'] }}</p>
+                <p><strong>Nama Pelapor:</strong> {{ $item['nama_pelapor'] }}</p>
+                <p><strong>Unit:</strong> {{ $item['unit'] }}</p>
+                <p><strong>Petugas:</strong> {{ $item['petugas'] }}</p>
+                <p><strong>Status:</strong> {{ $item['status'] }}</p>
+                <p><strong>Datetime Masuk:</strong> {{ $item['datetime_masuk'] }}</p>
+                <p><strong>Datetime Pengerjaan:</strong> {{ $item['datetime_pengerjaan'] }}</p>
+                <p><strong>Datetime Selesai:</strong> {{ $item['datetime_selesai'] }}</p>
+                <p><strong>Is Pending:</strong> {{ $item['is_pending'] }}</p>
+            </div>
+        @endforeach
+    @else
+        <p>Data tidak ditemukan untuk tahun {{ $year }} dan bulan {{ $month }}.</p>
+    @endif
+
 </body>
 </html>

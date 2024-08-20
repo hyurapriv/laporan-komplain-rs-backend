@@ -32,15 +32,18 @@ class NewDataController extends Controller
     public function getComplaintData(Request $request)
     {
         $year = $request->input('year', Carbon::now()->year);
-        $month = $request->input('month', Carbon::now()->month);
+        $month = $request->input('month', Carbon::now()->format('m'));
 
         $data = $this->fetchComplaintData($year, $month);
 
         $result = $this->processComplaintData($data);
 
+        $availableMonths = $this->getAvailableMonths($data);
+
         return response()->json([
             'success' => true,
-            'data' => $result + ['availableMonths' => $this->getAvailableMonths($year)],
+            'data' => $result,
+            'availableMonths' => $availableMonths,
         ]);
     }
 
@@ -50,49 +53,67 @@ class NewDataController extends Controller
             ->where('form_id', 3)
             ->whereYear('created_at', $year)
             ->whereMonth('created_at', $month)
-            ->select('json', 'status', 'datetime_masuk', 'datetime_pengerjaan', 'datetime_selesai', 'petugas', 'is_pending')
+            ->select('id', 'json', 'status', 'datetime_masuk', 'datetime_pengerjaan', 'datetime_selesai', 'petugas', 'is_pending')
             ->get();
     }
 
     private function processComplaintData(Collection $data)
-    {
-        $units = [];
-        $petugasCounts = array_fill_keys(self::PETUGAS_LIST, 0);
-        $petugasCounts['Lainnya'] = 0;
-        $totalStatus = array_fill_keys(self::STATUS_LIST, 0);
-        $totalResponTime = 0;
-        $totalResponCount = 0;
+{
+    $units = [];
+    $petugasCounts = array_fill_keys(self::PETUGAS_LIST, 0);
+    $petugasCounts['Lainnya'] = 0;
+    $totalStatus = array_fill_keys(self::STATUS_LIST, 0);
+    $totalResponTime = 0;
+    $totalResponCount = 0;
+    $totalComplaints = 0;
 
-        foreach ($data as $item) {
-            $jsonData = json_decode($item->json, true)[0] ?? [];
-
-            if ($this->getValueFromJson($jsonData, 'text-1709615631557-0') === 'tes') {
-                continue;
-            }
-
-            $status = $this->getFinalStatus($item);
-            $unitValue = $this->getUnitValue($jsonData);
-
-            $this->updateUnitStats($units, $unitValue, $status, $item);
-            $this->updatePetugasCounts($petugasCounts, $item->petugas);
-            $totalStatus[$status]++;
-
-            if ($status !== 'Pending') {
-                $responTime = $this->calculateResponTime($item);
-                $totalResponTime += $responTime;
-                $totalResponCount++;
-            }
+    foreach ($data as $item) {
+        // Mengecualikan data dengan ID tertentu
+        if ($item->id == 1404) {
+            continue;
         }
 
-        $this->calculateAverageResponTimes($units);
-        $overallAverageResponTime = $totalResponCount > 0 ? $this->formatResponTime($totalResponTime / $totalResponCount) : null;
-
-        if ($petugasCounts['Lainnya'] === 0) {
-            unset($petugasCounts['Lainnya']);
+        // Decode JSON data
+        $jsonData = json_decode($item->json, true)[0] ?? [];
+        
+        // Check if the reporter's name is "tes"
+        $reporterName = $this->getValueFromJson($jsonData, 'Nama (Yang Membuat Laporan)');
+        Log::info("Nama Pelapor: " . $reporterName);  // Tambahkan log untuk debugging
+        if (strtolower(trim($reporterName)) === 'tes') {
+            continue; // Skip this entry
         }
 
-        return compact('units', 'totalStatus', 'petugasCounts', 'overallAverageResponTime');
+        $unitValue = $this->getUnitValue($jsonData);
+
+        if ($unitValue === 'Tidak Ditentukan' || $unitValue === null) {
+            continue;
+        }
+
+        $status = $this->getFinalStatus($item);
+
+        $this->updateUnitStats($units, $unitValue, $status, $item);
+        $this->updatePetugasCounts($petugasCounts, $item->petugas);
+        $totalStatus[$status]++;
+        $totalComplaints++;
+
+        if ($status !== 'Pending') {
+            $responTime = $this->calculateResponTime($item);
+            $totalResponTime += $responTime;
+            $totalResponCount++;
+        }
     }
+
+    $this->calculateAverageResponTimes($units);
+    $overallAverageResponTime = $totalResponCount > 0 ? $this->formatResponTime($totalResponTime / $totalResponCount) : null;
+
+    if ($petugasCounts['Lainnya'] === 0) {
+        unset($petugasCounts['Lainnya']);
+    }
+
+    return compact('units', 'totalStatus', 'petugasCounts', 'overallAverageResponTime', 'totalComplaints');
+}
+
+
 
     private function getFinalStatus($item)
     {
@@ -105,7 +126,11 @@ class NewDataController extends Controller
     private function getUnitValue($jsonData)
     {
         $unitData = collect($jsonData)->firstWhere('name', 'select-1722845859503-0');
-        return $unitData ? collect($unitData['values'])->firstWhere('selected', 1)['label'] : 'Tidak Ditentukan';
+        if (!$unitData) {
+            return null;
+        }
+        $selectedValue = collect($unitData['values'])->firstWhere('selected', 1);
+        return $selectedValue ? $selectedValue['label'] : null;
     }
 
     private function updateUnitStats(&$units, $unitValue, $status, $item)
@@ -180,41 +205,88 @@ class NewDataController extends Controller
         return implode(', ', array_unique($normalizedList));
     }
 
-    private function getAvailableMonths()
+    private function getAvailableMonths($data)
     {
-        $previousYear = Carbon::now()->subYear()->year;
+        $availableMonths = [];
 
-        // Ambil data dari tahun lalu
-        $availableMonths = DB::table('form_values')
-            ->where('form_id', 3)
-            ->whereYear('created_at', $previousYear)
-            ->selectRaw('MONTH(created_at) as month')
-            ->groupBy('month')
-            ->havingRaw('SUM(json REGEXP "select-1722845859503-0") > 0')
-            ->pluck('month')
-            ->map(fn($month) => Carbon::create($previousYear, $month)->format('Y-m'))
-            ->toArray();
+        $groupedData = $data->groupBy(function ($item) {
+            return Carbon::parse($item->datetime_masuk)->format('Y-m');
+        });
 
-        // Log untuk debugging
-        Log::info('Available Months for Previous Year:', $availableMonths);
+        foreach ($groupedData as $month => $items) {
+            $hasValidUnits = $items->contains(function ($item) {
+                $jsonData = json_decode($item->json, true)[0] ?? [];
+                $unitValue = $this->getUnitValue($jsonData);
 
-        // Jika tidak ada data, fallback ke tahun ini
-        if (empty($availableMonths)) {
-            $currentYear = Carbon::now()->year;
-            $availableMonths = DB::table('form_values')
-                ->where('form_id', 3)
-                ->whereYear('created_at', $currentYear)
-                ->selectRaw('MONTH(created_at) as month')
-                ->groupBy('month')
-                ->havingRaw('SUM(json REGEXP "select-1722845859503-0") > 0')
-                ->pluck('month')
-                ->map(fn($month) => Carbon::create($currentYear, $month)->format('Y-m'))
-                ->toArray();
+                return $unitValue !== 'Tidak Ditentukan' && $unitValue !== null;
+            });
 
-            // Log untuk debugging
-            Log::info('Available Months for Current Year:', $availableMonths);
+            if ($hasValidUnits) {
+                $availableMonths[] = $month;
+            }
         }
 
         return $availableMonths;
+    }
+
+    // Controller
+    public function showComplaintData(Request $request)
+    {
+        $year = $request->input('year', Carbon::now()->year);
+        $month = str_pad($request->input('month', Carbon::now()->month), 2, '0', STR_PAD_LEFT);
+
+        $data = $this->fetchComplaintData($year, $month);
+
+        if ($data->isEmpty()) {
+            return view('index', ['error' => 'Data tidak ditemukan']);
+        }
+
+        $formattedData = $data->map(function ($item) {
+            // Decode JSON
+            $jsonData = json_decode($item->json, true);
+
+            // Check if JSON data is valid
+            if (is_array($jsonData) && count($jsonData) > 0) {
+                // Flatten JSON structure to get values
+                $dataArray = $jsonData[0];
+
+                // Extract relevant information
+                $nama_pelapor = '';
+                $unit = '';
+                $status = '';
+
+                foreach ($dataArray as $data) {
+                    if ($data['type'] == 'text' && $data['label'] == 'Nama (Yang Membuat Laporan)') {
+                        $nama_pelapor = $data['value'];
+                    }
+                    if ($data['type'] == 'select') {
+                        foreach ($data['values'] as $value) {
+                            if (isset($value['selected']) && $value['selected'] == 1) {
+                                $unit = $value['label'];
+                            }
+                        }
+                    }
+                    if ($data['type'] == 'hidden' && $data['name'] == 'Status') {
+                        $status = $data['value'];
+                    }
+                }
+            } else {
+                $nama_pelapor = $unit = $status = 'N/A';
+            }
+
+            return [
+                'id' => $item->id ?? 'N/A',
+                'nama_pelapor' => $nama_pelapor,
+                'unit' => $unit,
+                'petugas' => $this->normalizePetugasNames($item->petugas) ?? 'N/A',
+                'status' => $status,
+                'datetime_masuk' => $item->datetime_masuk ?? 'N/A',
+                'datetime_pengerjaan' => $item->datetime_pengerjaan ?? 'N/A',
+                'datetime_selesai' => $item->datetime_selesai ?? 'N/A',
+                'is_pending' => $item->is_pending === 1 ? 'Yes' : 'No',
+            ];
+        });
+
+        return view('index', ['formattedData' => $formattedData, 'year' => $year, 'month' => $month]);
     }
 }
