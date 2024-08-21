@@ -64,6 +64,8 @@ class UpdateRequestController extends Controller
         $totalStatus = array_fill_keys(self::STATUS_LIST, 0);
         $totalRequests = 0;
         $dailyRequests = [];
+        $responseTimes = [];
+        $completedResponseTimes = [];
 
         foreach ($data as $item) {
             $jsonData = json_decode($item->json, true)[0] ?? [];
@@ -86,13 +88,20 @@ class UpdateRequestController extends Controller
 
             $date = Carbon::parse($item->datetime_masuk)->format('Y-m-d');
             $dailyRequests[$date] = ($dailyRequests[$date] ?? 0) + 1;
+
+            // Calculate response times
+            $this->calculateResponseTimes($item, $responseTimes, $completedResponseTimes);
         }
 
         if ($petugasCounts['Lainnya'] === 0) {
             unset($petugasCounts['Lainnya']);
         }
 
-        return compact('petugasCounts', 'totalStatus', 'totalRequests', 'dailyRequests');
+        // Calculate average response times
+        $averageResponseTime = $this->calculateAverageResponseTime($responseTimes);
+        $averageCompletedResponseTime = $this->calculateAverageResponseTime($completedResponseTimes);
+
+        return compact('petugasCounts', 'totalStatus', 'totalRequests', 'dailyRequests', 'averageResponseTime', 'averageCompletedResponseTime');
     }
 
     private function getFinalStatus($item)
@@ -159,6 +168,27 @@ class UpdateRequestController extends Controller
         return $availableMonths;
     }
 
+    private function calculateResponseTimes($item, &$responseTimes, &$completedResponseTimes)
+    {
+        if (!empty($item->datetime_masuk) && !empty($item->datetime_pengerjaan)) {
+            $responseTime = Carbon::parse($item->datetime_masuk)->diffInMinutes(Carbon::parse($item->datetime_pengerjaan));
+            $responseTimes[] = $responseTime;
+        }
+
+        if (!empty($item->datetime_masuk) && !empty($item->datetime_selesai)) {
+            $completedResponseTime = Carbon::parse($item->datetime_masuk)->diffInMinutes(Carbon::parse($item->datetime_selesai));
+            $completedResponseTimes[] = $completedResponseTime;
+        }
+    }
+
+    private function calculateAverageResponseTime($responseTimes)
+    {
+        if (count($responseTimes) === 0) {
+            return null;
+        }
+        return round(array_sum($responseTimes) / count($responseTimes), 2);
+    }
+
     public function showUpdateRequestData(Request $request)
     {
         $year = $request->input('year', Carbon::now()->year);
@@ -195,23 +225,37 @@ class UpdateRequestController extends Controller
             return [
                 'id' => $item->id ?? 'N/A',
                 'nama_pelapor' => $nama_pelapor,
-                'petugas' => $this->normalizePetugasNames($item->petugas) ?? 'N/A',
                 'status' => $status,
                 'datetime_masuk' => $item->datetime_masuk ?? 'N/A',
                 'datetime_pengerjaan' => $item->datetime_pengerjaan ?? 'N/A',
                 'datetime_selesai' => $item->datetime_selesai ?? 'N/A',
-                'is_pending' => $item->is_pending === 1 ? 'Yes' : 'No',
             ];
         });
 
         return view('update_requests', [
-            'formattedData' => $formattedData,
-            'year' => $year,
-            'month' => $month,
+            'data' => $formattedData,
             'petugasCounts' => $processedData['petugasCounts'],
             'totalStatus' => $processedData['totalStatus'],
             'totalRequests' => $processedData['totalRequests'],
-            'dailyRequests' => $processedData['dailyRequests']
+            'dailyRequests' => $processedData['dailyRequests'],
+            'averageResponseTime' => $processedData['averageResponseTime'],
+            'averageCompletedResponseTime' => $processedData['averageCompletedResponseTime'],
         ]);
+    }
+
+    private function formatTime($minutes)
+    {
+        if ($minutes < 60) {
+            return $minutes . ' menit';
+        }
+
+        $hours = floor($minutes / 60);
+        $remainingMinutes = $minutes % 60;
+
+        if ($remainingMinutes === 0) {
+            return $hours . ' jam';
+        }
+
+        return $hours . ' jam ' . $remainingMinutes . ' menit';
     }
 }
