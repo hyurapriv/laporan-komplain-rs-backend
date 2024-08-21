@@ -72,14 +72,55 @@ class NewDataController extends Controller
 
         $result = $this->processComplaintData($data);
 
+        $detailData = $this->getDetailData($data);
+
         $availableMonths = $this->getAvailableMonths($data);
 
         return response()->json([
             'success' => true,
             'data' => $result,
+            'detailData' => $detailData,
             'availableMonths' => $availableMonths,
         ]);
     }
+
+    private function getDetailData(Collection $data)
+    {
+        $detailDataTerkirim = [];
+        $detailDataProses = [];
+        $detailDataPending = [];
+
+        foreach ($data as $item) {
+            $jsonData = json_decode($item->json, true)[0] ?? [];
+            $reporterName = $this->getValueFromJson($jsonData, 'Nama (Yang Membuat Laporan)');
+
+            if (strtolower(trim($reporterName)) === 'tes') {
+                continue;
+            }
+
+            $detailItem = [
+                'id' => $item->id,
+                'namaPelapor' => $reporterName,
+                'petugas' => $this->normalizePetugasNames($item->petugas),
+                'datetime_masuk' => $item->datetime_masuk,
+            ];
+
+            if ($item->datetime_selesai === null && $item->petugas === null) {
+                $detailDataTerkirim[] = $detailItem;
+            } elseif ($item->datetime_selesai === null && $item->petugas !== null && !$item->is_pending) {
+                $detailDataProses[] = $detailItem;
+            } elseif ($item->datetime_selesai === null && $item->petugas !== null && $item->is_pending) {
+                $detailDataPending[] = $detailItem;
+            }
+        }
+
+        return [
+            'detailDataTerkirim' => $detailDataTerkirim,
+            'detailDataProses' => $detailDataProses,
+            'detailDataPending' => $detailDataPending,
+        ];
+    }
+
 
     private function fetchComplaintData($year, $month)
     {
@@ -239,7 +280,7 @@ class NewDataController extends Controller
     {
         $hours = floor($minutes / 60);
         $remainingMinutes = $minutes % 60;
-        
+
         if ($hours > 0 && $remainingMinutes > 0) {
             return "{$hours} jam {$remainingMinutes} menit";
         } elseif ($hours > 0) {
