@@ -137,10 +137,9 @@ class NewDataController extends Controller
 
             $status = $this->getFinalStatus($item);
 
-            // Memeriksa apakah ada petugas dalam kategori "Lainnya"
             $normalizedPetugas = $this->normalizePetugasNames($item->petugas);
             if (strpos($normalizedPetugas, 'Lainnya') !== false) {
-                continue;  // Jika ada petugas yang termasuk "Lainnya", skip entri ini
+                continue;
             }
 
             $this->updateCategoryStats($categories[$category], $unitValue, $status, $item);
@@ -165,7 +164,6 @@ class NewDataController extends Controller
 
         return compact('categories', 'categoryTotals', 'totalStatus', 'petugasCounts', 'overallAverageResponTime', 'totalComplaints');
     }
-
 
     private function updateCategoryStats(&$category, $unitValue, $status, $item)
     {
@@ -206,21 +204,6 @@ class NewDataController extends Controller
         return $selectedValue ? $selectedValue['label'] : null;
     }
 
-    private function updateUnitStats(&$units, $unitValue, $status, $item)
-    {
-        if (!isset($units[$unitValue])) {
-            $units[$unitValue] = array_fill_keys(self::STATUS_LIST, 0) + ['Total' => 0, 'totalResponTime' => 0, 'responCount' => 0];
-        }
-        $units[$unitValue][$status]++;
-        $units[$unitValue]['Total']++;
-
-        if ($status !== 'Pending') {
-            $responTime = $this->calculateResponTime($item);
-            $units[$unitValue]['totalResponTime'] += $responTime;
-            $units[$unitValue]['responCount']++;
-        }
-    }
-
     private function updatePetugasCounts(&$petugasCounts, $petugas)
     {
         $petugasList = array_unique(explode(', ', $this->normalizePetugasNames($petugas)));
@@ -256,7 +239,14 @@ class NewDataController extends Controller
     {
         $hours = floor($minutes / 60);
         $remainingMinutes = $minutes % 60;
-        return $hours > 0 ? ($remainingMinutes > 0 ? "{$hours}h {$remainingMinutes}m" : "{$hours}h") : "{$minutes}m";
+        
+        if ($hours > 0 && $remainingMinutes > 0) {
+            return "{$hours} jam {$remainingMinutes} menit";
+        } elseif ($hours > 0) {
+            return "{$hours} jam";
+        } else {
+            return "{$minutes} menit";
+        }
     }
 
     private function getValueFromJson($jsonData, $key)
@@ -269,14 +259,11 @@ class NewDataController extends Controller
     {
         if (empty($petugas)) return null;
 
-        // Memecah string petugas berdasarkan koma, ampersand, atau "dan"
         $petugasList = preg_split('/\s*[,&]\s*|\s+dan\s+/i', $petugas);
 
         $normalizedList = array_map(function ($name) {
-            // Trim dan ubah nama menjadi huruf kecil untuk pencocokan
             $normalizedName = strtolower(trim($name));
 
-            // Memeriksa apakah ada penggantian nama dalam daftar penggantian, dengan case-insensitive
             $finalName = null;
             foreach (self::PETUGAS_REPLACEMENTS as $key => $replacement) {
                 if (strtolower(trim($key)) === $normalizedName) {
@@ -285,18 +272,15 @@ class NewDataController extends Controller
                 }
             }
 
-            // Jika tidak ada penggantian yang ditemukan, gunakan nama asli (title case)
             if (!$finalName) {
                 $finalName = ucwords($normalizedName);
             }
 
-            // Mengembalikan nama yang sesuai dengan daftar petugas atau 'Lainnya'
             return in_array($finalName, self::PETUGAS_LIST) ? $finalName : 'Lainnya';
         }, $petugasList);
 
         return implode(', ', array_unique($normalizedList));
     }
-
 
     private function getAvailableMonths($data)
     {
@@ -322,7 +306,6 @@ class NewDataController extends Controller
         return $availableMonths;
     }
 
-    // Controller
     public function showComplaintData(Request $request)
     {
         $year = $request->input('year', Carbon::now()->year);
@@ -337,15 +320,11 @@ class NewDataController extends Controller
         $processedData = $this->processComplaintData($data);
 
         $formattedData = $data->map(function ($item) {
-            // Decode JSON
             $jsonData = json_decode($item->json, true);
 
-            // Check if JSON data is valid
             if (is_array($jsonData) && count($jsonData) > 0) {
-                // Flatten JSON structure to get values
                 $dataArray = $jsonData[0];
 
-                // Extract relevant information
                 $nama_pelapor = '';
                 $unit = '';
                 $status = '';
