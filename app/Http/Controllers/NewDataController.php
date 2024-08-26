@@ -139,9 +139,6 @@ class NewDataController extends Controller
         ];
     }
 
-
-
-
     private function fetchComplaintData($year, $month)
     {
         return DB::table('form_values')

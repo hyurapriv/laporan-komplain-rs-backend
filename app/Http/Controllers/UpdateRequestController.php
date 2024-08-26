@@ -34,16 +34,33 @@ class UpdateRequestController extends Controller
         $year = $request->input('year', Carbon::now()->year);
         $month = $request->input('month', Carbon::now()->format('m'));
 
+        // Ambil data dari database
         $data = $this->fetchUpdateRequestData($year, $month);
 
+        // Proses dan format data
         $result = $this->processUpdateRequestData($data);
 
+        // Dapatkan bulan yang tersedia
         $availableMonths = $this->getAvailableMonths($year);
 
+        // Dapatkan data detail update
+        $detailData = $this->getDetailUpdateData($data);
+
+        // Log data detail untuk debugging
+        Log::info('Detail Data:', [
+            'detailDataTerkirim' => $detailData['updateDataTerkirim'],
+            'detailDataProses' => $detailData['updateDataProses'],
+            'detailDataPending' => $detailData['updateDataPending']
+        ]);
+
+        // Kembalikan respons JSON
         return response()->json([
             'success' => true,
             'data' => $result,
             'availableMonths' => $availableMonths,
+            'detailDataTerkirim' => $detailData['updateDataTerkirim'],
+            'detailDataProses' => $detailData['updateDataProses'],
+            'detailDataPending' => $detailData['updateDataPending'],
         ]);
     }
 
@@ -58,51 +75,57 @@ class UpdateRequestController extends Controller
     }
 
     private function processUpdateRequestData(Collection $data)
-    {
-        $petugasCounts = array_fill_keys(self::PETUGAS_LIST, 0);
-        $petugasCounts['Lainnya'] = 0;
-        $totalStatus = array_fill_keys(self::STATUS_LIST, 0);
-        $totalRequests = 0;
-        $dailyRequests = [];
-        $responseTimes = [];
-        $completedResponseTimes = [];
+{
+    $petugasCounts = array_fill_keys(self::PETUGAS_LIST, 0);
+    $totalStatus = array_fill_keys(self::STATUS_LIST, 0);
+    $totalRequests = 0;
+    $dailyRequests = [];
+    $responseTimes = [];
+    $completedResponseTimes = [];
 
-        foreach ($data as $item) {
-            $jsonData = json_decode($item->json, true)[0] ?? [];
+    foreach ($data as $item) {
+        $jsonData = json_decode($item->json, true)[0] ?? [];
 
-            $reporterName = $this->getValueFromJson($jsonData, 'Nama (Yang Membuat Laporan)');
-            if (strtolower(trim($reporterName)) === 'tes') {
-                continue;
-            }
-
-            $status = $this->getFinalStatus($item);
-
-            $normalizedPetugas = $this->normalizePetugasNames($item->petugas);
-            if (strpos($normalizedPetugas, 'Lainnya') !== false) {
-                continue;
-            }
-
-            $this->updatePetugasCounts($petugasCounts, $item->petugas);
-            $totalStatus[$status]++;
-            $totalRequests++;
-
-            $date = Carbon::parse($item->datetime_masuk)->format('Y-m-d');
-            $dailyRequests[$date] = ($dailyRequests[$date] ?? 0) + 1;
-
-            // Calculate response times
-            $this->calculateResponseTimes($item, $responseTimes, $completedResponseTimes);
+        $reporterName = $this->getValueFromJson($jsonData, 'Nama (Yang Membuat Laporan)');
+        if (strtolower(trim($reporterName)) === 'tes') {
+            continue;
         }
 
-        if ($petugasCounts['Lainnya'] === 0) {
-            unset($petugasCounts['Lainnya']);
+        $status = $this->getFinalStatus($item);
+
+        $normalizedPetugas = $this->normalizePetugasNames($item->petugas);
+        $petugasList = array_filter(explode(', ', $normalizedPetugas), function($petugas) {
+            return in_array($petugas, self::PETUGAS_LIST);
+        });
+        
+        if (empty($petugasList)) {
+            continue;
         }
 
-        // Calculate average response times
-        $averageResponseTime = $this->calculateAverageResponseTime($responseTimes);
-        $averageCompletedResponseTime = $this->calculateAverageResponseTime($completedResponseTimes);
+        $petugasCount = count($petugasList);
+        foreach ($petugasList as $petugas) {
+            $petugasCounts[$petugas] += (1 / $petugasCount);
+        }
+        
+        $totalStatus[$status]++;
+        $totalRequests++;
 
-        return compact('petugasCounts', 'totalStatus', 'totalRequests', 'dailyRequests', 'averageResponseTime', 'averageCompletedResponseTime');
+        $date = Carbon::parse($item->datetime_masuk)->format('Y-m-d');
+        $dailyRequests[$date] = ($dailyRequests[$date] ?? 0) + 1;
+
+        $this->calculateResponseTimes($item, $responseTimes, $completedResponseTimes);
     }
+
+    // Round the petugas counts to whole numbers
+    $petugasCounts = array_map(function($count) {
+        return round($count);
+    }, $petugasCounts);
+
+    $averageResponseTime = $this->calculateAverageResponseTime($responseTimes);
+    $averageCompletedResponseTime = $this->calculateAverageResponseTime($completedResponseTimes);
+
+    return compact('petugasCounts', 'totalStatus', 'totalRequests', 'dailyRequests', 'averageResponseTime', 'averageCompletedResponseTime');
+}
 
     private function getFinalStatus($item)
     {
@@ -129,31 +152,31 @@ class UpdateRequestController extends Controller
     }
 
     private function normalizePetugasNames($petugas)
-    {
-        if (empty($petugas)) return null;
+{
+    if (empty($petugas)) return null;
 
-        $petugasList = preg_split('/\s*[,&]\s*|\s+dan\s+/i', $petugas);
+    $petugasList = preg_split('/\s*[,&]\s*|\s+dan\s+/i', $petugas);
 
-        $normalizedList = array_map(function ($name) {
-            $normalizedName = strtolower(trim($name));
+    $normalizedList = array_map(function ($name) {
+        $normalizedName = strtolower(trim($name));
 
-            $finalName = null;
-            foreach (self::PETUGAS_REPLACEMENTS as $key => $replacement) {
-                if (strtolower(trim($key)) === $normalizedName) {
-                    $finalName = $replacement;
-                    break;
-                }
+        $finalName = null;
+        foreach (self::PETUGAS_REPLACEMENTS as $key => $replacement) {
+            if (strtolower(trim($key)) === $normalizedName) {
+                $finalName = $replacement;
+                break;
             }
+        }
 
-            if (!$finalName) {
-                $finalName = ucwords($normalizedName);
-            }
+        if (!$finalName) {
+            $finalName = ucwords($normalizedName);
+        }
 
-            return in_array($finalName, self::PETUGAS_LIST) ? $finalName : 'Lainnya';
-        }, $petugasList);
+        return in_array($finalName, self::PETUGAS_LIST) ? $finalName : 'Lainnya';
+    }, $petugasList);
 
-        return implode(', ', array_unique($normalizedList));
-    }
+    return implode(', ', array_unique($normalizedList));
+}
 
     private function getAvailableMonths($year)
     {
@@ -189,73 +212,79 @@ class UpdateRequestController extends Controller
         return round(array_sum($responseTimes) / count($responseTimes), 2);
     }
 
-    public function showUpdateRequestData(Request $request)
+    private function getDetailUpdateData(Collection $data)
     {
-        $year = $request->input('year', Carbon::now()->year);
-        $month = str_pad($request->input('month', Carbon::now()->month), 2, '0', STR_PAD_LEFT);
-
-        $data = $this->fetchUpdateRequestData($year, $month);
-
-        if ($data->isEmpty()) {
-            return view('update_requests', ['error' => 'Data tidak ditemukan']);
-        }
-
-        $processedData = $this->processUpdateRequestData($data);
-
-        $formattedData = $data->map(function ($item) {
+        $updateDataTerkirim = [];
+        $updateDataProses = [];
+        $updateDataPending = [];
+    
+        foreach ($data as $item) {
+            // Decode JSON data
             $jsonData = json_decode($item->json, true);
-
-            if (is_array($jsonData) && count($jsonData) > 0) {
-                $dataArray = $jsonData[0];
-                $nama_pelapor = '';
-                $status = '';
-
-                foreach ($dataArray as $data) {
-                    if ($data['type'] == 'text' && $data['label'] == 'Nama (Yang Membuat Laporan)') {
-                        $nama_pelapor = $data['value'];
+    
+            $nama_pelapor = 'N/A';
+            if (is_array($jsonData)) {
+                // Coba cari nama pelapor di struktur JSON yang berbeda
+                $nama_pelapor = $this->findReporterName($jsonData);
+            }
+    
+            // Log untuk debugging
+            Log::info("Processing item ID: " . $item->id . ", Nama Pelapor: " . $nama_pelapor);
+    
+            // Skip data where the reporter name is 'tes'
+            if (strtolower(trim($nama_pelapor)) === 'tes') {
+                continue;
+            }
+    
+            // Create detail item
+            $detailItem = [
+                'id' => $item->id,
+                'namaPelapor' => $nama_pelapor,
+                'petugas' => $this->normalizePetugasNames($item->petugas),
+                'datetime_masuk' => $item->datetime_masuk,
+            ];
+    
+            // Determine status category
+            if ($item->datetime_selesai === null && $item->petugas === null) {
+                $updateDataTerkirim[] = $detailItem;
+            } elseif ($item->datetime_selesai === null && $item->petugas !== null && !$item->is_pending) {
+                $detailItem['datetime_pengerjaan'] = $item->datetime_pengerjaan;
+                $updateDataProses[] = $detailItem;
+            } elseif ($item->datetime_selesai === null && $item->petugas !== null && $item->is_pending) {
+                $detailItem['datetime_pengerjaan'] = $item->datetime_pengerjaan;
+                $updateDataPending[] = $detailItem;
+            }
+        }
+    
+        return [
+            'updateDataTerkirim' => $updateDataTerkirim,
+            'updateDataProses' => $updateDataProses,
+            'updateDataPending' => $updateDataPending,
+        ];
+    }
+    
+    private function findReporterName($jsonData)
+    {
+        // Fungsi rekursif untuk mencari nama pelapor
+        $search = function($data) use (&$search) {
+            if (is_array($data)) {
+                foreach ($data as $key => $value) {
+                    if ($key === 'label' && $value === 'Nama (Yang Membuat Laporan)' && isset($data['value'])) {
+                        return $data['value'];
                     }
-                    if ($data['type'] == 'hidden' && $data['name'] == 'Status') {
-                        $status = $data['value'];
+                    if (is_array($value)) {
+                        $result = $search($value);
+                        if ($result !== null) {
+                            return $result;
+                        }
                     }
                 }
-            } else {
-                $nama_pelapor = $status = 'N/A';
             }
-
-            return [
-                'id' => $item->id ?? 'N/A',
-                'nama_pelapor' => $nama_pelapor,
-                'status' => $status,
-                'datetime_masuk' => $item->datetime_masuk ?? 'N/A',
-                'datetime_pengerjaan' => $item->datetime_pengerjaan ?? 'N/A',
-                'datetime_selesai' => $item->datetime_selesai ?? 'N/A',
-            ];
-        });
-
-        return view('update_requests', [
-            'data' => $formattedData,
-            'petugasCounts' => $processedData['petugasCounts'],
-            'totalStatus' => $processedData['totalStatus'],
-            'totalRequests' => $processedData['totalRequests'],
-            'dailyRequests' => $processedData['dailyRequests'],
-            'averageResponseTime' => $processedData['averageResponseTime'],
-            'averageCompletedResponseTime' => $processedData['averageCompletedResponseTime'],
-        ]);
+            return null;
+        };
+    
+        $result = $search($jsonData);
+        return $result !== null ? $result : 'N/A';
     }
-
-    private function formatTime($minutes)
-    {
-        if ($minutes < 60) {
-            return $minutes . ' menit';
-        }
-
-        $hours = floor($minutes / 60);
-        $remainingMinutes = $minutes % 60;
-
-        if ($remainingMinutes === 0) {
-            return $hours . ' jam';
-        }
-
-        return $hours . ' jam ' . $remainingMinutes . ' menit';
-    }
+    
 }
