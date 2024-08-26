@@ -30,5 +30,6 @@ Route::get('/data/download', [DataController::class, 'download'])->name('data.do
 Route::get('/data/komplain', [DataController::class, 'getKomplainData'])->name('data.komplain');
 Route::get('/data/view', [DataController::class, 'renderView'])->name('data.renderView');
 Route::get('/new-data', [NewDataController::class, 'showComplaintData'])->name('newdata');
+Route::get('/unsent-data', [NewDataController::class, 'showSkippedData'])->name('unsentdata');
 
 

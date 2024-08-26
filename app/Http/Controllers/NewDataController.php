@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\FormValue;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -91,25 +92,42 @@ class NewDataController extends Controller
         $detailDataPending = [];
 
         foreach ($data as $item) {
-            $jsonData = json_decode($item->json, true)[0] ?? [];
-            $reporterName = $this->getValueFromJson($jsonData, 'Nama (Yang Membuat Laporan)');
+            // Decode JSON data
+            $jsonData = json_decode($item->json, true);
 
-            if (strtolower(trim($reporterName)) === 'tes') {
+            $nama_pelapor = '';
+            if (is_array($jsonData) && count($jsonData) > 0) {
+                $dataArray = $jsonData[0]; // Assuming the relevant data is in the first element
+
+                foreach ($dataArray as $data) {
+                    if ($data['type'] == 'text' && $data['label'] == 'Nama (Yang Membuat Laporan)') {
+                        $nama_pelapor = $data['value'];
+                        break; // No need to continue the loop once we have found the name
+                    }
+                }
+            }
+
+            // Skip data where the reporter name is 'tes'
+            if (strtolower(trim($nama_pelapor)) === 'tes') {
                 continue;
             }
 
+            // Create detail item
             $detailItem = [
                 'id' => $item->id,
-                'namaPelapor' => $reporterName,
+                'namaPelapor' => $nama_pelapor ?: 'N/A',
                 'petugas' => $this->normalizePetugasNames($item->petugas),
                 'datetime_masuk' => $item->datetime_masuk,
             ];
 
+            // Determine status category
             if ($item->datetime_selesai === null && $item->petugas === null) {
                 $detailDataTerkirim[] = $detailItem;
             } elseif ($item->datetime_selesai === null && $item->petugas !== null && !$item->is_pending) {
+                $detailItem['datetime_pengerjaan'] = $item->datetime_pengerjaan;
                 $detailDataProses[] = $detailItem;
             } elseif ($item->datetime_selesai === null && $item->petugas !== null && $item->is_pending) {
+                $detailItem['datetime_pengerjaan'] = $item->datetime_pengerjaan;
                 $detailDataPending[] = $detailItem;
             }
         }
@@ -120,6 +138,8 @@ class NewDataController extends Controller
             'detailDataPending' => $detailDataPending,
         ];
     }
+
+
 
 
     private function fetchComplaintData($year, $month)
@@ -172,9 +192,9 @@ class NewDataController extends Controller
             $unitValue = $this->getUnitValue($jsonData);
             $category = $this->getUnitCategory($unitValue);
 
-            if ($category === 'Kategori Lainnya' && $unitValue !== 'Lainnya') {
-                continue;
-            }
+            // if ($category === 'Kategori Lainnya' && $unitValue !== 'Lainnya') {
+            //     continue;
+            // }
 
             $status = $this->getFinalStatus($item);
 
@@ -410,5 +430,28 @@ class NewDataController extends Controller
             'totalStatus' => $processedData['totalStatus'],
             'totalComplaints' => $processedData['totalComplaints']
         ]);
+    }
+
+    public function showSkippedData()
+    {
+        // Logika untuk mengambil data keluhan
+        $allComplaints = FormValue::all(); // Contoh: ambil semua data keluhan
+
+        // Mengumpulkan data yang diskip
+        $skippedData = [];
+
+        foreach ($allComplaints as $complaint) {
+            if ($this->shouldSkip($complaint)) {
+                $skippedData[] = $complaint;
+            }
+        }
+
+        return view('unsent_data', compact('skippedData'));
+    }
+
+    private function shouldSkip($complaint)
+    {
+        // Contoh logika untuk menentukan apakah data harus diskip
+        return $complaint->is_pending;
     }
 }
