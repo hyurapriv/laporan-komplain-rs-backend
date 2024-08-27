@@ -340,26 +340,14 @@ class NewDataController extends Controller
         return implode(', ', array_unique($normalizedList));
     }
 
-    private function getAvailableMonths($data)
+    private function getAvailableMonths()
     {
-        $availableMonths = [];
-
-        $groupedData = $data->groupBy(function ($item) {
-            return Carbon::parse($item->datetime_masuk)->format('Y-m');
-        });
-
-        foreach ($groupedData as $month => $items) {
-            $hasValidUnits = $items->contains(function ($item) {
-                $jsonData = json_decode($item->json, true)[0] ?? [];
-                $unitValue = $this->getUnitValue($jsonData);
-
-                return $unitValue !== 'Tidak Ditentukan' && $unitValue !== null;
-            });
-
-            if ($hasValidUnits) {
-                $availableMonths[] = $month;
-            }
-        }
+        $availableMonths = DB::table('form_values')
+            ->where('form_id', 3)
+            ->select(DB::raw('DISTINCT DATE_FORMAT(datetime_masuk, "%Y-%m") as month'))
+            ->orderBy('month', 'desc')
+            ->pluck('month')
+            ->toArray();
 
         return $availableMonths;
     }
