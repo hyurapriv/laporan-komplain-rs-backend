@@ -256,9 +256,5 @@ class UpdateRequestController extends Controller
         $result = $search($jsonData);
         return $result !== null ? $result : 'N/A';
     }
-
-    public function tes() {
-        return view('tes');
-    }
 }
 
