@@ -73,47 +73,40 @@ class UpdateRequestController extends Controller
         $dailyRequests = [];
         $responseTimes = [];
         $completedResponseTimes = [];
-
+    
         foreach ($data as $item) {
             $jsonData = json_decode($item->json, true)[0] ?? [];
-
+    
             $reporterName = $this->getValueFromJson($jsonData, 'Nama');
             if (strtolower(trim($reporterName)) === 'tes') {
                 continue;
             }
-
+    
             $status = $this->getFinalStatus($item);
-
+    
             $totalStatus[$status]++;
             $totalRequests++;
-
+    
             if ($status !== 'Terkirim') {
                 $normalizedPetugas = $this->normalizePetugasNames($item->petugas);
                 $petugasList = array_filter(explode(', ', $normalizedPetugas), function ($petugas) {
                     return in_array($petugas, self::PETUGAS_LIST);
                 });
-
-                if (!empty($petugasList)) {
-                    $petugasCount = count($petugasList);
-                    foreach ($petugasList as $petugas) {
-                        $petugasCounts[$petugas] += (1 / $petugasCount);
-                    }
+    
+                foreach ($petugasList as $petugas) {
+                    $petugasCounts[$petugas]++;
                 }
             }
-
+    
             $date = Carbon::parse($item->datetime_masuk)->format('Y-m-d');
             $dailyRequests[$date] = ($dailyRequests[$date] ?? 0) + 1;
-
+    
             $this->calculateResponseTimes($item, $responseTimes, $completedResponseTimes);
         }
-
-        $petugasCounts = array_map(function ($count) {
-            return round($count);
-        }, $petugasCounts);
-
+    
         $averageResponseTime = $this->calculateAverageResponseTime($responseTimes);
         $averageCompletedResponseTime = $this->calculateAverageResponseTime($completedResponseTimes);
-
+    
         return compact('petugasCounts', 'totalStatus', 'totalRequests', 'dailyRequests', 'averageResponseTime', 'averageCompletedResponseTime');
     }
 
@@ -257,4 +250,3 @@ class UpdateRequestController extends Controller
         return $result !== null ? $result : 'N/A';
     }
 }
-
