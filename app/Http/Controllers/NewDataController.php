@@ -26,8 +26,8 @@ class NewDataController extends Controller
         'virgie' => 'Virgie',
         'Vi' => 'Virgie',
         'vi' => 'Virgie',
-        'Virgie Dika' => 'Virgie, Adika',
-        'Virgie dikq' => 'Virgie, Adika',
+        'ali' => 'Ali Muhson',
+        'muhson' => 'Ali Muhson',
     ];
 
     private const UNIT_CATEGORIES = [
@@ -167,7 +167,6 @@ class NewDataController extends Controller
             'Status' => array_fill_keys(self::STATUS_LIST, 0)
         ]);
         $petugasCounts = array_fill_keys(self::PETUGAS_LIST, 0);
-        $petugasCounts['Lainnya'] = 0;
         $totalStatus = array_fill_keys(self::STATUS_LIST, 0);
         $totalResponTime = 0;
         $totalResponCount = 0;
@@ -189,20 +188,13 @@ class NewDataController extends Controller
             $unitValue = $this->getUnitValue($jsonData);
             $category = $this->getUnitCategory($unitValue);
 
-            // if ($category === 'Kategori Lainnya' && $unitValue !== 'Lainnya') {
-            //     continue;
-            // }
-
             $status = $this->getFinalStatus($item);
 
             $normalizedPetugas = $this->normalizePetugasNames($item->petugas);
-            if (strpos($normalizedPetugas, 'Lainnya') !== false) {
-                continue;
-            }
 
             $this->updateCategoryStats($categories[$category], $unitValue, $status, $item);
             $this->updateCategoryTotals($categoryTotals[$category], $status);
-            $this->updatePetugasCounts($petugasCounts, $item->petugas);
+            $this->updatePetugasCounts($petugasCounts, $normalizedPetugas);
             $totalStatus[$status]++;
             $totalComplaints++;
 
@@ -215,10 +207,6 @@ class NewDataController extends Controller
 
         $this->calculateAverageResponTimes($categories);
         $overallAverageResponTime = $totalResponCount > 0 ? $this->formatResponTime($totalResponTime / $totalResponCount) : null;
-
-        if ($petugasCounts['Lainnya'] === 0) {
-            unset($petugasCounts['Lainnya']);
-        }
 
         return compact('categories', 'categoryTotals', 'totalStatus', 'petugasCounts', 'overallAverageResponTime', 'totalComplaints');
     }
@@ -262,11 +250,10 @@ class NewDataController extends Controller
         return $selectedValue ? $selectedValue['label'] : null;
     }
 
-    private function updatePetugasCounts(&$petugasCounts, $petugas)
+    private function updatePetugasCounts(&$petugasCounts, $normalizedPetugas)
     {
-        $petugasList = array_unique(explode(', ', $this->normalizePetugasNames($petugas)));
-        foreach ($petugasList as $petugas) {
-            if (in_array($petugas, self::PETUGAS_LIST)) {
+        foreach ($normalizedPetugas as $petugas) {
+            if (isset($petugasCounts[$petugas])) {
                 $petugasCounts[$petugas]++;
             }
         }
@@ -315,30 +302,57 @@ class NewDataController extends Controller
 
     private function normalizePetugasNames($petugas)
     {
-        if (empty($petugas)) return null;
+        if (empty($petugas)) return [];
 
-        $petugasList = preg_split('/\s*[,&]\s*|\s+dan\s+/i', $petugas);
+        // First, split by obvious separators
+        $roughSplit = preg_split('/\s*[,&+]\s*|\s+dan\s+/i', $petugas);
 
-        $normalizedList = array_map(function ($name) {
-            $normalizedName = strtolower(trim($name));
-
-            $finalName = null;
-            foreach (self::PETUGAS_REPLACEMENTS as $key => $replacement) {
-                if (strtolower(trim($key)) === $normalizedName) {
-                    $finalName = $replacement;
-                    break;
+        $normalizedList = [];
+        foreach ($roughSplit as $namePart) {
+            $words = preg_split('/\s+/', trim($namePart));
+            $currentName = '';
+            foreach ($words as $word) {
+                $currentName .= ($currentName ? ' ' : '') . $word;
+                $normalizedName = $this->normalizeSingleName($currentName);
+                if ($normalizedName) {
+                    $normalizedList[] = $normalizedName;
+                    $currentName = '';
                 }
             }
-
-            if (!$finalName) {
-                $finalName = ucwords($normalizedName);
+            // Check if there's any remaining part of the name
+            if ($currentName) {
+                $normalizedName = $this->normalizeSingleName($currentName);
+                if ($normalizedName) {
+                    $normalizedList[] = $normalizedName;
+                }
             }
+        }
 
-            return in_array($finalName, self::PETUGAS_LIST) ? $finalName : 'Lainnya';
-        }, $petugasList);
-
-        return implode(', ', array_unique($normalizedList));
+        // Remove duplicates
+        return array_unique($normalizedList);
     }
+
+    private function normalizeSingleName($name)
+    {
+        $lowerName = strtolower(trim($name));
+
+        // Check PETUGAS_REPLACEMENTS first
+        foreach (self::PETUGAS_REPLACEMENTS as $key => $replacement) {
+            if (strpos($lowerName, strtolower($key)) !== false) {
+                return $replacement;
+            }
+        }
+
+        // Then check PETUGAS_LIST
+        foreach (self::PETUGAS_LIST as $validPetugas) {
+            if (strtolower($validPetugas) === $lowerName) {
+                return $validPetugas;
+            }
+        }
+
+        return null; // Return null for unrecognized names
+    }
+
 
     private function getAvailableMonths()
     {
