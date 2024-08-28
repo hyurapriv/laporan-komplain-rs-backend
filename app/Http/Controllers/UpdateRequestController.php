@@ -25,8 +25,8 @@ class UpdateRequestController extends Controller
         'virgie' => 'Virgie',
         'Vi' => 'Virgie',
         'vi' => 'Virgie',
-        'Virgie Dika' => 'Virgie, Adika',
-        'Virgie dikq' => 'Virgie, Adika',
+        'ali' => 'Ali Muhson',
+        'muhson' => 'Ali Muhson',
     ];
 
     public function getUpdateRequestData(Request $request)
@@ -73,40 +73,41 @@ class UpdateRequestController extends Controller
         $dailyRequests = [];
         $responseTimes = [];
         $completedResponseTimes = [];
-    
+
         foreach ($data as $item) {
             $jsonData = json_decode($item->json, true)[0] ?? [];
-    
+
             $reporterName = $this->getValueFromJson($jsonData, 'Nama');
             if (strtolower(trim($reporterName)) === 'tes') {
                 continue;
             }
-    
+
             $status = $this->getFinalStatus($item);
-    
+
             $totalStatus[$status]++;
             $totalRequests++;
-    
+
             if ($status !== 'Terkirim') {
-                $normalizedPetugas = $this->normalizePetugasNames($item->petugas);
-                $petugasList = array_filter(explode(', ', $normalizedPetugas), function ($petugas) {
-                    return in_array($petugas, self::PETUGAS_LIST);
-                });
-    
+                $petugasList = $this->normalizePetugasNames($item->petugas);
+                
+                Log::info('Petugas List for Item ID ' . $item->id . ': ', ['petugasList' => $petugasList]);
+                
                 foreach ($petugasList as $petugas) {
-                    $petugasCounts[$petugas]++;
+                    if (isset($petugasCounts[$petugas])) {
+                        $petugasCounts[$petugas]++;
+                    }
                 }
             }
-    
+
             $date = Carbon::parse($item->datetime_masuk)->format('Y-m-d');
             $dailyRequests[$date] = ($dailyRequests[$date] ?? 0) + 1;
-    
+
             $this->calculateResponseTimes($item, $responseTimes, $completedResponseTimes);
         }
-    
+
         $averageResponseTime = $this->calculateAverageResponseTime($responseTimes);
         $averageCompletedResponseTime = $this->calculateAverageResponseTime($completedResponseTimes);
-    
+
         return compact('petugasCounts', 'totalStatus', 'totalRequests', 'dailyRequests', 'averageResponseTime', 'averageCompletedResponseTime');
     }
 
@@ -126,29 +127,55 @@ class UpdateRequestController extends Controller
 
     private function normalizePetugasNames($petugas)
     {
-        if (empty($petugas)) return null;
+        if (empty($petugas)) return [];
 
-        $petugasList = preg_split('/\s*[,&]\s*|\s+dan\s+/i', $petugas);
+        // First, split by obvious separators
+        $roughSplit = preg_split('/\s*[,&+]\s*|\s+dan\s+/i', $petugas);
 
-        $normalizedList = array_map(function ($name) {
-            $normalizedName = strtolower(trim($name));
-
-            $finalName = null;
-            foreach (self::PETUGAS_REPLACEMENTS as $key => $replacement) {
-                if (strtolower(trim($key)) === $normalizedName) {
-                    $finalName = $replacement;
-                    break;
+        $normalizedList = [];
+        foreach ($roughSplit as $namePart) {
+            $words = preg_split('/\s+/', trim($namePart));
+            $currentName = '';
+            foreach ($words as $word) {
+                $currentName .= ($currentName ? ' ' : '') . $word;
+                $normalizedName = $this->normalizeSingleName($currentName);
+                if ($normalizedName) {
+                    $normalizedList[] = $normalizedName;
+                    $currentName = '';
                 }
             }
-
-            if (!$finalName) {
-                $finalName = ucwords($normalizedName);
+            // Check if there's any remaining part of the name
+            if ($currentName) {
+                $normalizedName = $this->normalizeSingleName($currentName);
+                if ($normalizedName) {
+                    $normalizedList[] = $normalizedName;
+                }
             }
+        }
 
-            return in_array($finalName, self::PETUGAS_LIST) ? $finalName : 'Lainnya';
-        }, $petugasList);
+        // Remove duplicates
+        return array_unique($normalizedList);
+    }
 
-        return implode(', ', array_unique($normalizedList));
+    private function normalizeSingleName($name)
+    {
+        $lowerName = strtolower(trim($name));
+
+        // Check PETUGAS_REPLACEMENTS first
+        foreach (self::PETUGAS_REPLACEMENTS as $key => $replacement) {
+            if (strpos($lowerName, strtolower($key)) !== false) {
+                return $replacement;
+            }
+        }
+
+        // Then check PETUGAS_LIST
+        foreach (self::PETUGAS_LIST as $validPetugas) {
+            if (strtolower($validPetugas) === $lowerName) {
+                return $validPetugas;
+            }
+        }
+
+        return null; // Return null for unrecognized names
     }
 
     private function getAvailableMonths($year)
@@ -200,10 +227,12 @@ class UpdateRequestController extends Controller
                 continue;
             }
 
+            $petugasList = $this->normalizePetugasNames($item->petugas);
+
             $detailItem = [
                 'id' => $item->id,
                 'namaPelapor' => $nama_pelapor,
-                'petugas' => $this->normalizePetugasNames($item->petugas),
+                'petugas' => implode(', ', $petugasList),
                 'datetime_masuk' => $item->datetime_masuk,
             ];
 
