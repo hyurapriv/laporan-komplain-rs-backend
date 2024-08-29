@@ -89,6 +89,7 @@ class NewDataController extends Controller
     {
         $detailDataTerkirim = [];
         $detailDataProses = [];
+        $detailDataSelesai = [];
         $detailDataPending = [];
 
         foreach ($data as $item) {
@@ -129,12 +130,15 @@ class NewDataController extends Controller
             } elseif ($item->datetime_selesai === null && $item->petugas !== null && $item->is_pending) {
                 $detailItem['datetime_pengerjaan'] = $item->datetime_pengerjaan;
                 $detailDataPending[] = $detailItem;
+            } else if ($item->datetime_selesai !== null) {
+                $detailDataSelesai[] = $detailItem;
             }
         }
 
         return [
             'detailDataTerkirim' => $detailDataTerkirim,
             'detailDataProses' => $detailDataProses,
+            'detailDataSelesai' => $detailDataSelesai,
             'detailDataPending' => $detailDataPending,
         ];
     }
@@ -151,6 +155,10 @@ class NewDataController extends Controller
 
     private function getUnitCategory($unitValue)
     {
+        if (empty($unitValue) || $unitValue === 'Pilih Unit') {
+            return 'Kategori Lainnya';
+        }
+
         foreach (self::UNIT_CATEGORIES as $category => $units) {
             if (in_array($unitValue, $units)) {
                 return $category;
@@ -187,6 +195,11 @@ class NewDataController extends Controller
 
             $unitValue = $this->getUnitValue($jsonData);
             $category = $this->getUnitCategory($unitValue);
+
+            // Jika kategori adalah 'Kategori Lainnya', selalu gunakan 'Lainnya' sebagai unitValue
+            if ($category === 'Kategori Lainnya') {
+                $unitValue = 'Lainnya';
+            }
 
             $status = $this->getFinalStatus($item);
 

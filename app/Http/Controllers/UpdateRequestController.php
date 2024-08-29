@@ -51,6 +51,7 @@ class UpdateRequestController extends Controller
             'availableMonths' => $availableMonths,
             'detailDataTerkirim' => $detailData['updateDataTerkirim'],
             'detailDataProses' => $detailData['updateDataProses'],
+            'detailDataSelesai' => $detailData['updateDataSelesai'],
             'detailDataPending' => $detailData['updateDataPending'],
         ]);
     }
@@ -214,6 +215,7 @@ class UpdateRequestController extends Controller
     {
         $updateDataTerkirim = [];
         $updateDataProses = [];
+        $updateDataSelesai = [];
         $updateDataPending = [];
 
         foreach ($data as $item) {
@@ -238,20 +240,23 @@ class UpdateRequestController extends Controller
 
             $status = $this->getFinalStatus($item);
             
-            if ($status === 'Terkirim') {
+            if ($item->datetime_selesai === null && $item->petugas === null) {
                 $updateDataTerkirim[] = $detailItem;
-            } elseif ($status === 'Dalam Pengerjaan / Pengecekan Petugas') {
+            } elseif ($item->datetime_selesai === null && $item->petugas !== null && !$item->is_pending) {
                 $detailItem['datetime_pengerjaan'] = $item->datetime_pengerjaan;
                 $updateDataProses[] = $detailItem;
-            } elseif ($status === 'Pending') {
+            } elseif ($item->datetime_selesai === null && $item->petugas !== null && $item->is_pending) {
                 $detailItem['datetime_pengerjaan'] = $item->datetime_pengerjaan;
                 $updateDataPending[] = $detailItem;
+            } else if ($item->datetime_selesai !== null) {
+                $updateDataSelesai[] = $detailItem;
             }
         }
 
         return [
             'updateDataTerkirim' => $updateDataTerkirim,
             'updateDataProses' => $updateDataProses,
+            'updateDataSelesai' => $updateDataSelesai,
             'updateDataPending' => $updateDataPending,
         ];
     }
